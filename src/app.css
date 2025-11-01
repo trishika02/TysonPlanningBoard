@@ -1,0 +1,75 @@
+/* FIX: Add the core Tailwind directives.
+  These lines scan your components and generate all the necessary CSS.
+*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* Custom styles for the planner */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+}
+
+.sticky-sidebar {
+    position: sticky;
+    left: 0;
+    z-index: 20;
+}
+
+.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.calendar-scroll {
+    overflow-x: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.calendar-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.drag-over {
+    background-color: #e0f2fe;
+    outline: 2px dashed #0ea5e9;
+}
+
+.drag-over-invalid {
+    background-color: #ffe4e6;
+    outline: 2px dashed #f43f5e;
+}
+
+.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    user-select: none;
+    pointer-events: none;
+}
+
+.grid-cell {
+    background-image: var(--grid-lines-faint, none);
+    background-size: 100% 100%;
+    transition: background-color 0.1s ease-in-out;
+}
+
+.grid-cell.drag-over {
+    background-image: var(--grid-lines-strong, none);
+    background-color: #e0f2fe;
+    outline: 2px dashed #0ea5e9;
+}
+
+.grid-cell.drag-over-invalid {
+    background-image: none;
+    background-color: #ffe4e6;
+    outline: 2px dashed #f43f5e;
+}
+
+#ghost-task {
+    transition: background-color 0.1s, border-color 0.1s;
+}
