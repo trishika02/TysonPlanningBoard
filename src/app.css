@@ -5,71 +5,88 @@
 @tailwind components;
 @tailwind utilities;
 
+  /* Custom styles for the planner */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ensure sticky elements work with overflow */
+        .sticky-sidebar {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+        }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        /* Custom scrollbar for the main calendar area */
+        .calendar-scroll {
+            overflow-x: auto;
+            -ms-overflow-style: none; /* IE and Edge */
+            scrollbar-width: none; /* Firefox */
+        }
+        .calendar-scroll::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, and Opera */
+        }
+        /* Style for drag-over effect */
+        .drag-over {
+            background-color: #e0f2fe; /* light-blue-100 */
+            outline: 2px dashed #0ea5e9; /* sky-500 */
+        }
+        /* Style for invalid drop (blocked day or overlap) */
+        .drag-over-invalid {
+            background-color: #ffe4e6; /* red-100 */
+            outline: 2px dashed #f43f5e; /* rose-500 */
+        }
+        /* Prevent selection while dragging */
+        .dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+            user-select: none;
+        }
+        /* Grid cell styles */
+        .grid-cell {
+            background-image: var(--grid-lines-faint, none);
+            background-size: 100% 100%;
+            transition: background-color 0.1s ease-in-out;
+        }
+        .grid-cell.drag-over {
+            /* Prominent grid lines */
+            background-image: var(--grid-lines-strong, none);
+            background-color: #e0f2fe; /* light-blue-100 */
+            outline: 2px dashed #0ea5e9; /* sky-500 */
+        }
+        .grid-cell.drag-over-invalid {
+            background-image: none; /* No grid on invalid */
+            background-color: #ffe4e6; /* red-100 */
+            outline: 2px dashed #f43f5e; /* rose-500 */
+        }
+        .dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+            user-select: none;
+            pointer-events: none; /* <-- ADD THIS LINE */
+        }
 
-/* Custom styles for the planner */
-body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Inter', sans-serif;
-}
-
-.sticky-sidebar {
-    position: sticky;
-    left: 0;
-    z-index: 20;
-}
-
-.sticky-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-.calendar-scroll {
-    overflow-x: auto;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-
-.calendar-scroll::-webkit-scrollbar {
-    display: none;
-}
-
-.drag-over {
-    background-color: #e0f2fe;
-    outline: 2px dashed #0ea5e9;
-}
-
-.drag-over-invalid {
-    background-color: #ffe4e6;
-    outline: 2px dashed #f43f5e;
-}
-
-.dragging {
-    opacity: 0.5;
-    cursor: grabbing;
-    user-select: none;
-    pointer-events: none;
-}
-
-.grid-cell {
-    background-image: var(--grid-lines-faint, none);
-    background-size: 100% 100%;
-    transition: background-color 0.1s ease-in-out;
-}
-
-.grid-cell.drag-over {
-    background-image: var(--grid-lines-strong, none);
-    background-color: #e0f2fe;
-    outline: 2px dashed #0ea5e9;
-}
-
-.grid-cell.drag-over-invalid {
-    background-image: none;
-    background-color: #ffe4e6;
-    outline: 2px dashed #f43f5e;
-}
-
-#ghost-task {
-    transition: background-color 0.1s, border-color 0.1s;
-}
+        /* === NEW GHOST TASK STYLES === */
+        #ghost-task {
+            position: absolute;
+            z-index: 50; /* Above all tasks */
+            opacity: 0.7;
+            border-style: dashed;
+            border-width: 2px;
+            pointer-events: none; /* Must not interfere with drop targets */
+            transition: background-color 0.1s, border-color 0.1s; /* Smooth color change */
+            box-sizing: border-box;
+            border-radius: 0.5rem; /* 8px */
+            padding: 0.5rem; /* 8px */
+        }
+        #ghost-task.valid {
+            background-color: #dbeafe; /* blue-100 */
+            border-color: #3b82f6; /* blue-500 */
+        }
+        #ghost-task.invalid {
+            background-color: #fee2e2; /* red-100 */
+            border-color: #ef4444; /* red-500 */
+        }
