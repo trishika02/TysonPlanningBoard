@@ -47,12 +47,12 @@
     </div>
 
     <!-- Task Tooltip -->
-    <div id="tooltip" class="fixed z-50 hidden px-3 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg shadow-sm" role="tooltip">
-        <!-- Tooltip content will be injected by JS -->
-    </div>
+    <Tooltip />
 
 <script>
     import { onMount } from 'svelte';
+    import Tooltip from '$lib/components/Tooltip.svelte';
+    import { tooltipStore } from '$lib/stores/tooltipStore.svelte.js';
 
     onMount(() => {
 
@@ -155,7 +155,7 @@
             const sidebarRows = document.getElementById('sidebar-rows');
             const calendarDates = document.getElementById('calendar-dates');
             const calendarGrid = document.getElementById('calendar-grid');
-            const tooltip = document.getElementById('tooltip');
+            // const tooltip = document.getElementById('tooltip'); // Removed
             const loadingModal = document.getElementById('loading-modal');
 
 
@@ -736,20 +736,16 @@
             function showTooltip(e) {
                 const content = e.currentTarget.dataset.tooltipContent;
                 if (content) {
-                    tooltip.innerHTML = content;
-                    tooltip.style.display = 'block';
-                    moveTooltip(e);
+                    tooltipStore.show(e.pageX, e.pageY, content);
                 }
             }
             
             function hideTooltip(e) {
-                tooltip.style.display = 'none';
+                tooltipStore.hide();
             }
 
             function moveTooltip(e) {
-                // Position tooltip near the cursor
-                tooltip.style.left = `${e.pageX + 10}px`;
-                tooltip.style.top = `${e.pageY + 10}px`;
+                tooltipStore.move(e.pageX, e.pageY);
             }
 
             // === 6. HELPER FUNCTIONS ===
