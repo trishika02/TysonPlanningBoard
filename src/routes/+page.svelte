@@ -1,24 +1,13 @@
 
     <div id="app" class="flex h-screen w-full">
         <!-- === Left Sticky Sidebar (Line Names) === -->
-        <div id="sidebar" class="sticky-sidebar flex-shrink-0 bg-white shadow-lg">
-            <!-- Sidebar Header -->
-            <div class="h-auto md:h-24 border-b border-gray-200 flex flex-col justify-center p-4 sticky-header bg-white">
-                <h2 class="text-lg font-bold text-gray-700 text-center">Lines</h2>
-                <!-- NEW: Date Navigation -->
-                <div class="mt-2 space-y-2">
-                    <div class="flex space-x-2">
-                        <input type="date" id="date-picker" class="text-xs p-1 border rounded w-full">
-                        <button id="go-to-date-btn" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">Go</button>
-                    </div>
-                    <button id="go-to-today-btn" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 w-full px-2 py-1 rounded">Go to Today</button>
-                </div>
-            </div>
-            <!-- Sidebar Body (Line Rows) -->
-            <div id="sidebar-rows" class="divide-y divide-gray-200">
-                <!-- Line names will be injected by JS -->
-            </div>
-        </div>
+        <!-- === Left Sticky Sidebar (Line Names) === -->
+        <Sidebar 
+            {lines} 
+            rowHeight={ROW_HEIGHT} 
+            onDateChange={handleDateChange} 
+            onResetDate={handleResetDate} 
+        />
 
         <!-- === Main Content (Scrollable Calendar) === -->
         <div id="main-content" class="flex-1 flex flex-col">
@@ -72,6 +61,7 @@
     import { onMount, tick } from 'svelte';
     import Tooltip from '$lib/components/Tooltip.svelte';
     import Task from '$lib/components/Task.svelte';
+    import Sidebar from '$lib/components/Sidebar.svelte';
     import { tooltipStore } from '$lib/stores/tooltipStore.svelte.js';
 
     // === 1. TOP LEVEL STATE ===
@@ -332,6 +322,48 @@
     }
 
     // === 5. EVENT HANDLERS ===
+    
+    function handleDateChange(newDateStr) {
+        // Ensure modal exists before trying to show it
+        const modal = document.getElementById('loading-modal');
+        if (modal) modal.style.display = 'flex';
+        
+        requestAnimationFrame(() => {
+            const newDate = new Date(newDateStr + 'T00:00:00'); // Use local time
+            today = newDate;
+            today.setHours(0, 0, 0, 0);
+            
+            setTimeout(() => {
+                if (typeof renderBoard === 'function') {
+                    renderBoard();
+                } else {
+                    console.error("renderBoard is not defined");
+                    if (modal) modal.style.display = 'none';
+                }
+            }, 50);
+        });
+    }
+
+    function handleResetDate() {
+        const modal = document.getElementById('loading-modal');
+        if (modal) modal.style.display = 'flex';
+        
+        requestAnimationFrame(() => {
+            const newToday = new Date();
+            newToday.setHours(0, 0, 0, 0);
+            today = newToday;
+            
+            setTimeout(() => {
+               if (typeof renderBoard === 'function') {
+                    renderBoard();
+                } else {
+                    console.error("renderBoard is not defined");
+                    if (modal) modal.style.display = 'none';
+                }
+            }, 50);
+        });
+    }
+
     function handleDragStart(e) {
         const realTaskId = e.target.dataset.taskId;
         if (!realTaskId) {
@@ -544,37 +576,36 @@
     }
 
 
-    onMount(() => {
-        // Init state
-        lines = [...MOCK_LINES];
-        tasks = [...MOCK_TASKS];
 
-        const sidebarRows = document.getElementById('sidebar-rows');
-        const calendarDates = document.getElementById('calendar-dates');
-        const calendarGrid = document.getElementById('calendar-grid');
-        const loadingModal = document.getElementById('loading-modal');
-
-        function renderBoard() {
-            // Note: renderBoard now mainly handles the BACKGROUND GRID and SIDEBAR
+    function renderBoard() {
+            // Note: renderBoard now mainly handles the BACKGROUND GRID.
             // TASKS are reactive and handled by Svelte in #tasks-layer.
+            // SIDEBAR is reactive and handled by Sidebar component.
             
             console.log("Rendering board (background only)...");
             
-            // 1. Clear SIDEBAR
-            sidebarRows.innerHTML = '';
-            
-            // 2. Clear CALENDAR HEADER
+            const calendarDates = document.getElementById('calendar-dates');
+            const calendarGrid = document.getElementById('calendar-grid');
+            const loadingModal = document.getElementById('loading-modal');
+
+            // Safety check
+            if (!calendarDates || !calendarGrid) {
+                console.warn("DOM elements missing for renderBoard");
+                if (loadingModal) loadingModal.style.display = 'none';
+                return;
+            }
+
+            // 1. Clear CALENDAR HEADER
             calendarDates.innerHTML = '';
 
-            // 3. Clear GRID BACKGROUND ONLY
-            // We do NOT touch calendarGrid.innerHTML because that would kill the #tasks-layer!
+            // 2. Clear GRID BACKGROUND ONLY
             const gridBackgroundLayer = document.getElementById('grid-background-layer');
             if (gridBackgroundLayer) {
                 gridBackgroundLayer.innerHTML = '';
             }
             
             // RE-POPULATE calendarDays
-            calendarDays = []; 
+            const tempDays = [];
             const currentDate = new Date(today);
             for (let i = 0; i < NUM_DAYS_TO_SHOW; i++) {
                 const date = new Date(currentDate);
@@ -584,7 +615,7 @@
                 const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
                 const isBlocked = isWeekend || isHoliday;
 
-                calendarDays.push({
+                tempDays.push({
                     date,
                     dayOfWeek,
                     workHours,
@@ -593,15 +624,7 @@
                 });
                 currentDate.setDate(currentDate.getDate() + 1);
             }
-
-            // Render Sidebar
-            lines.forEach(line => {
-                const rowEl = document.createElement('div');
-                rowEl.className = 'flex items-center p-4 border-b border-gray-200';
-                rowEl.style.height = `${ROW_HEIGHT}px`;
-                rowEl.textContent = line.name;
-                sidebarRows.appendChild(rowEl);
-            });
+            calendarDays = tempDays;
 
             // Render Dates
             calendarDays.forEach((day) => {
@@ -642,8 +665,7 @@
                         const cellId = `cell-${line.id}-${formatDate(day.date, 'YYYY-MM-DD')}`;
                         const cell = document.createElement('div');
                         cell.id = cellId;
-                        // Use pointer-events-auto so we can drag over them, 
-                        // even though tasks layer is on top with pointer-events-none (for the container)
+                        // Use pointer-events-auto so we can drag over them.
                         cell.className = `grid-cell absolute border-r border-b border-gray-200 ${day.isBlocked ? 'bg-gray-100' : 'bg-white'}`;
                         cell.style.left = `${dayIndex * DAY_COLUMN_WIDTH}px`;
                         cell.style.top = `${lineIndex * ROW_HEIGHT}px`;
@@ -671,63 +693,25 @@
             `;
             loadMoreButton.addEventListener('click', () => {
                 NUM_DAYS_TO_SHOW += 30; 
-                loadingModal.style.display = 'flex'; 
+                if (loadingModal) loadingModal.style.display = 'flex'; 
                 setTimeout(() => renderBoard(), 50); 
             });
             calendarDates.appendChild(loadMoreButton);
 
             addDragDropListeners(); 
-            // addDateNavListeners(); // Already called once in onMount
             
-            loadingModal.style.display = 'none';
+            if (loadingModal) loadingModal.style.display = 'none';
             console.log("Render complete.");
         }
-        
+
         function addDragDropListeners() {
              // Re-attach listeners to NEW grid cells
-             const cells = calendarGrid.querySelectorAll('.grid-cell');
+             const cells = document.querySelectorAll('.grid-cell');
              cells.forEach(cell => {
                  cell.addEventListener('dragover', handleDragOver);
                  cell.addEventListener('dragleave', handleDragLeave);
                  cell.addEventListener('drop', handleDrop);
              });
-        }
-
-        function addDateNavListeners() {
-            // ... (keep logic, but update refs since we cleared innerHTML)
-            // But wait, the date nav INPUTS are in the SIDEBAR HEADER which is STATIC HTML.
-            // lines 9-14 in template. They are NOT cleared by renderBoard (sidebarRows is cleared).
-            // So we only need to add listeners ONCE, not every render.
-            // Move this out of renderBoard or check if added?
-            // Actually, just add them once in onMount.
-            
-            const btnDate = document.getElementById('go-to-date-btn');
-            const btnToday = document.getElementById('go-to-today-btn');
-            
-            // Remove old listeners? No easy way. 
-            // Better to clone node or just ensure we don't multiply.
-            // Or just do it once here in onMount.
-            
-            btnDate.onclick = () => {
-                 const datePicker = document.getElementById('date-picker');
-                 if (datePicker.value) {
-                     const newDate = new Date(datePicker.value + 'T00:00:00'); 
-                     today = newDate;
-                     today.setHours(0, 0, 0, 0);
-                     loadingModal.style.display = 'flex';
-                     setTimeout(() => renderBoard(), 50);
-                 }
-            };
-
-             btnToday.onclick = () => {
-                 const newToday = new Date();
-                 newToday.setHours(0, 0, 0, 0);
-                 today = newToday;
-                 const datePicker = document.getElementById('date-picker');
-                 if (datePicker) datePicker.value = '';
-                 loadingModal.style.display = 'flex';
-                 setTimeout(() => renderBoard(), 50);
-             };
         }
 
         function alignMockDataToToday() {
@@ -746,9 +730,12 @@
              }
         }
         
+    onMount(() => {
+        // Init state
+        lines = [...MOCK_LINES];
+        tasks = [...MOCK_TASKS];
+
         // Initial setup
-        addDateNavListeners(); // Add once
-        
         setTimeout(() => {
             alignMockDataToToday();
             renderBoard();
