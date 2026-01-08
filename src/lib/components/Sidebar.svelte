@@ -17,7 +17,7 @@
 
 <div id="sidebar" class="sticky-sidebar flex-shrink-0 bg-white shadow-lg z-20">
     <!-- Sidebar Header -->
-    <div class="h-auto md:h-24 border-b border-gray-200 flex flex-col justify-center p-4 sticky-header bg-white">
+    <div class="sidebar-header h-auto md:h-24 border-b border-gray-200 flex flex-col justify-center p-4 sticky-header bg-white">
         <h2 class="text-lg font-bold text-gray-700 text-center">Lines</h2>
         <!-- Date Navigation -->
         <div class="mt-2 space-y-2">

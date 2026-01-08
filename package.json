@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"engines": {
-		"node": "22.x"
+		"node": ">=22"
 	},
 	"scripts": {
 		"dev": "vite dev",
@@ -42,5 +42,8 @@
 		"vite": "^7.1.10",
 		"vitest": "^3.2.4",
 		"vitest-browser-svelte": "^1.1.0"
+	},
+	"volta": {
+		"node": "22.12.0"
 	}
 }
