@@ -1,3 +1,163 @@
+        
+        <script>
+            import Calendar from '$lib/components/Calendar.svelte';
+            import Sidebar from '$lib/components/Sidebar.svelte';
+            import Tooltip from '$lib/components/Tooltip.svelte';
+            import { onMount } from 'svelte';
+        
+            // === 1. TOP LEVEL STATE ===
+            let tasks = $state([]);
+            let lines = $state([]);
+            
+            // === 2. MOCK DATA & CONSTANTS ===
+            const MOCK_LINES = [
+                { id: 'line-1', name: 'Line 01' },
+                { id: 'line-2', name: 'Line 02' },
+                { id: 'line-3', name: 'Line 03' },
+                { id: 'line-4', name: 'Line 04 (Sewing)' },
+                { id: 'line-5', name: 'Line 05' },
+                { id: 'line-6', name: 'Line 06 (Sewing)' },
+                { id: 'line-7', name: 'Line 07 (Finishing)' },
+                { id: 'line-8', name: 'Line 08' },
+            ];
+        
+            const MOCK_TASKS = [
+                {
+                    id: 'task-101',
+                    lineId: 'line-1',
+                    orderId: 'PO-4567',
+                    style: 'T-Shirt (Red)',
+                    quantity: 5000,
+                    start: '2025-11-01T09:00:00',
+                    end: '2025-11-01T13:30:00'
+                },
+                {
+                    id: 'task-102',
+                    lineId: 'line-2',
+                    orderId: 'PO-4568',
+                    style: 'Polo (Blue)',
+                    quantity: 3000,
+                    start: '2025-11-01T14:00:00',
+                    end: '2025-11-01T17:00:00'
+                },
+                {
+                    id: 'task-103',
+                    lineId: 'line-2',
+                    orderId: 'PO-4569',
+                    style: 'Jeans (Black)',
+                    quantity: 1200,
+                    start: '2025-11-03T09:00:00',
+                    end: '2025-11-06T17:00:00'
+                },
+                {
+                    id: 'task-104',
+                    lineId: 'line-3',
+                    orderId: 'PO-4570',
+                    style: 'Jacket (Denim)',
+                    quantity: 250,
+                    start: '2025-11-03T11:30:00',
+                    end: '2025-11-03T16:00:00'
+                },
+                {
+                    id: 'task-105',
+                    lineId: 'line-4',
+                    orderId: 'PO-4571',
+                    style: 'Shorts (Cargo)',
+                    quantity: 800,
+                    start: '2025-11-05T10:00:00',
+                    end: '2025-11-05T18:00:00'
+                }
+            ];
+        
+            const MOCK_HOLIDAYS = [
+                '2025-12-16', 
+                '2025-12-25', 
+                '2026-01-01', 
+            ];
+        
+            let holidays = [...MOCK_HOLIDAYS];
+            let today = $state(new Date(new Date().setHours(0, 0, 0, 0)));
+        
+            const ROW_HEIGHT = 100;
+        
+            // === 5. EVENT HANDLERS ===
+            
+            function handleDateChange(newDateStr) {
+                // Ensure modal exists before trying to show it
+                const modal = document.getElementById('loading-modal');
+                if (modal) modal.style.display = 'flex';
+                
+                requestAnimationFrame(() => {
+                    const newDate = new Date(newDateStr + 'T00:00:00'); // Use local time
+                    let t = newDate;
+                    t.setHours(0, 0, 0, 0);
+                    today = t; // Update state
+                    
+                    setTimeout(() => {
+                        if (modal) modal.style.display = 'none';
+                    }, 50); // Simulate load time or wait for render
+                });
+            }
+        
+            function handleResetDate() {
+                const modal = document.getElementById('loading-modal');
+                if (modal) modal.style.display = 'flex';
+                
+                requestAnimationFrame(() => {
+                    const newToday = new Date();
+                    newToday.setHours(0, 0, 0, 0);
+                    today = newToday;
+                    
+                    setTimeout(() => {
+                        if (modal) modal.style.display = 'none';
+                    }, 50);
+                });
+            }
+        
+            // Helper for mock data (duplicated simplified version or just inline logic)
+            function formatDate(date, format) {
+                 // Minimal implementation needed for alignMockDataToToday
+                 const year = date.getFullYear();
+                 const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                 const day = date.getDate().toString().padStart(2, '0');
+                 return `${year}-${month}-${day}`;
+            }
+        
+            function alignMockDataToToday() {
+                 const todayStr = formatDate(today, 'YYYY-MM-DD');
+                 // 4 days from today
+                 const fourDaysFromToday = new Date(today);
+                 fourDaysFromToday.setDate(today.getDate() + 4);
+                 const fourDaysFromTodayStr = formatDate(fourDaysFromToday, 'YYYY-MM-DD');
+                 const sevenDaysFromToday = new Date(today);
+                 sevenDaysFromToday.setDate(today.getDate() + 7);
+                 const sevenDaysFromTodayStr = formatDate(sevenDaysFromToday, 'YYYY-MM-DD');
+                 
+                 // Mutate state
+                 const task101 = tasks.find(t => t.id === 'task-101');
+                 if (task101) {
+                     task101.start = `${todayStr}T09:00:00`;
+                     task101.end = `${fourDaysFromTodayStr}T13:30:00`;
+                 }
+                 const task102 = tasks.find(t => t.id === 'task-102');
+                 if (task102) {
+                     task102.start = `${fourDaysFromTodayStr}T14:00:00`;
+                     task102.end = `${sevenDaysFromTodayStr}T17:00:00`;
+                 }
+            }
+                
+            onMount(() => {
+                // Init state
+                lines = [...MOCK_LINES];
+                tasks = [...MOCK_TASKS];
+        
+                // Initial setup
+                setTimeout(() => {
+                    alignMockDataToToday();
+                }, 500);
+        
+            });
+        </script>
 
     <div id="app" class="flex h-screen w-full">
         <!-- === Left Sticky Sidebar (Line Names) === -->
@@ -26,166 +186,3 @@
 
     <!-- Task Tooltip -->
     <Tooltip />
-
-<script>
-    import { onMount, tick } from 'svelte';
-    import Tooltip from '$lib/components/Tooltip.svelte';
-    import Sidebar from '$lib/components/Sidebar.svelte';
-    import Calendar from '$lib/components/Calendar.svelte';
-    import { tooltipStore } from '$lib/stores/tooltipStore.svelte.js';
-
-    // === 1. TOP LEVEL STATE ===
-    let tasks = $state([]);
-    let lines = $state([]);
-    
-    // === 2. MOCK DATA & CONSTANTS ===
-    const MOCK_LINES = [
-        { id: 'line-1', name: 'Line 01' },
-        { id: 'line-2', name: 'Line 02' },
-        { id: 'line-3', name: 'Line 03' },
-        { id: 'line-4', name: 'Line 04 (Sewing)' },
-        { id: 'line-5', name: 'Line 05' },
-        { id: 'line-6', name: 'Line 06 (Sewing)' },
-        { id: 'line-7', name: 'Line 07 (Finishing)' },
-        { id: 'line-8', name: 'Line 08' },
-    ];
-
-    const MOCK_TASKS = [
-        {
-            id: 'task-101',
-            lineId: 'line-1',
-            orderId: 'PO-4567',
-            style: 'T-Shirt (Red)',
-            quantity: 5000,
-            start: '2025-11-01T09:00:00',
-            end: '2025-11-01T13:30:00'
-        },
-        {
-            id: 'task-102',
-            lineId: 'line-2',
-            orderId: 'PO-4568',
-            style: 'Polo (Blue)',
-            quantity: 3000,
-            start: '2025-11-01T14:00:00',
-            end: '2025-11-01T17:00:00'
-        },
-        {
-            id: 'task-103',
-            lineId: 'line-2',
-            orderId: 'PO-4569',
-            style: 'Jeans (Black)',
-            quantity: 1200,
-            start: '2025-11-03T09:00:00',
-            end: '2025-11-06T17:00:00'
-        },
-        {
-            id: 'task-104',
-            lineId: 'line-3',
-            orderId: 'PO-4570',
-            style: 'Jacket (Denim)',
-            quantity: 250,
-            start: '2025-11-03T11:30:00',
-            end: '2025-11-03T16:00:00'
-        },
-        {
-            id: 'task-105',
-            lineId: 'line-4',
-            orderId: 'PO-4571',
-            style: 'Shorts (Cargo)',
-            quantity: 800,
-            start: '2025-11-05T10:00:00',
-            end: '2025-11-05T18:00:00'
-        }
-    ];
-
-    const MOCK_HOLIDAYS = [
-        '2025-12-16', 
-        '2025-12-25', 
-        '2026-01-01', 
-    ];
-
-    let holidays = [...MOCK_HOLIDAYS];
-    let today = $state(new Date()); 
-    
-    today.setHours(0, 0, 0, 0);
-
-    const ROW_HEIGHT = 100;
-
-    // === 5. EVENT HANDLERS ===
-    
-    function handleDateChange(newDateStr) {
-        // Ensure modal exists before trying to show it
-        const modal = document.getElementById('loading-modal');
-        if (modal) modal.style.display = 'flex';
-        
-        requestAnimationFrame(() => {
-            const newDate = new Date(newDateStr + 'T00:00:00'); // Use local time
-            let t = newDate;
-            t.setHours(0, 0, 0, 0);
-            today = t; // Update state
-            
-            setTimeout(() => {
-                if (modal) modal.style.display = 'none';
-            }, 50); // Simulate load time or wait for render
-        });
-    }
-
-    function handleResetDate() {
-        const modal = document.getElementById('loading-modal');
-        if (modal) modal.style.display = 'flex';
-        
-        requestAnimationFrame(() => {
-            const newToday = new Date();
-            newToday.setHours(0, 0, 0, 0);
-            today = newToday;
-            
-            setTimeout(() => {
-                if (modal) modal.style.display = 'none';
-            }, 50);
-        });
-    }
-
-    // Helper for mock data (duplicated simplified version or just inline logic)
-    function formatDate(date, format) {
-         // Minimal implementation needed for alignMockDataToToday
-         const year = date.getFullYear();
-         const month = (date.getMonth() + 1).toString().padStart(2, '0');
-         const day = date.getDate().toString().padStart(2, '0');
-         return `${year}-${month}-${day}`;
-    }
-
-    function alignMockDataToToday() {
-         const todayStr = formatDate(today, 'YYYY-MM-DD');
-         // 4 days from today
-         const fourDaysFromToday = new Date(today);
-         fourDaysFromToday.setDate(today.getDate() + 4);
-         const fourDaysFromTodayStr = formatDate(fourDaysFromToday, 'YYYY-MM-DD');
-         const sevenDaysFromToday = new Date(today);
-         sevenDaysFromToday.setDate(today.getDate() + 7);
-         const sevenDaysFromTodayStr = formatDate(sevenDaysFromToday, 'YYYY-MM-DD');
-         
-         // Mutate state
-         const task101 = tasks.find(t => t.id === 'task-101');
-         if (task101) {
-             task101.start = `${todayStr}T09:00:00`;
-             task101.end = `${fourDaysFromTodayStr}T13:30:00`;
-         }
-         const task102 = tasks.find(t => t.id === 'task-102');
-         if (task102) {
-             task102.start = `${fourDaysFromTodayStr}T14:00:00`;
-             task102.end = `${sevenDaysFromTodayStr}T17:00:00`;
-         }
-    }
-        
-    onMount(() => {
-        // Init state
-        lines = [...MOCK_LINES];
-        tasks = [...MOCK_TASKS];
-
-        // Initial setup
-        setTimeout(() => {
-            alignMockDataToToday();
-        }, 500);
-
-    });
-</script>

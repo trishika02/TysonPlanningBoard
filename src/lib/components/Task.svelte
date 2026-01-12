@@ -32,6 +32,11 @@
             <strong>End:</strong> ${endStr}
         `;
         tooltipStore.show(e.pageX, e.pageY, content);
+        console.log({
+            startStr,
+            endStr,
+        });
+        
     }
 
     function handleMouseMove(e) {
