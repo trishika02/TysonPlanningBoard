@@ -2,6 +2,13 @@
     let { lines, rowHeight, onDateChange, onResetDate } = $props();
 
     let dateValue = $state('');
+    let sidebarRows; // Reference to the rows container
+
+    export function setScrollTop(scrollTop) {
+        if (sidebarRows) {
+            sidebarRows.scrollTop = scrollTop;
+        }
+    }
 
     function handleDateGo() {
         if (dateValue) {
@@ -15,9 +22,9 @@
     }
 </script>
 
-<div id="sidebar" class="sticky-sidebar flex-shrink-0 bg-white shadow-lg z-20">
+<div id="sidebar" class="sticky-sidebar flex-shrink-0 bg-white shadow-lg z-20 flex flex-col h-full">
     <!-- Sidebar Header -->
-    <div class="sidebar-header h-auto md:h-24 border-b border-gray-200 flex flex-col justify-center p-4 sticky-header bg-white">
+    <div class="sidebar-header h-24 border-b border-gray-200 flex flex-col justify-center p-4 sticky-header bg-white flex-shrink-0">
         <h2 class="text-lg font-bold text-gray-700 text-center">Lines</h2>
         <!-- Date Navigation -->
         <div class="mt-2 space-y-2">
@@ -46,7 +53,11 @@
         </div>
     </div>
     <!-- Sidebar Body (Line Rows) -->
-    <div id="sidebar-rows" class="divide-y divide-gray-200">
+    <div 
+        bind:this={sidebarRows}
+        id="sidebar-rows" 
+        class="divide-y divide-gray-200 overflow-hidden flex-1"
+    >
         {#each lines as line (line.id)}
             <div 
                 class="flex items-center p-4 border-b border-gray-200"

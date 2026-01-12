@@ -7,7 +7,8 @@
         tasks = $bindable([]),
         lines = [],
         today = new Date(),
-        holidays = []
+        holidays = [],
+        onScroll = () => {}
     } = $props();
 
     // Internal State
@@ -603,17 +604,28 @@
 
 </script>
 
-<div id="main-content" class="flex-1 flex flex-col">
+<div id="main-content" class="flex-1 flex flex-col h-full overflow-hidden">
     <!-- Calendar Header (Dates) -->
-    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow z-10">
+    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow z-10 h-24 overflow-hidden">
         <!-- Header row for dates -->
-        <div id="calendar-dates" class="flex">
+        <div id="calendar-dates" class="flex h-full">
             <!-- Date columns will be injected by JS -->
         </div>
     </div>
 
     <!-- Calendar Body (Planning Grid) -->
-    <div id="calendar-body" class="flex-1 calendar-scroll">
+    <div 
+        id="calendar-body" 
+        class="flex-1 calendar-scroll overflow-auto"
+        onscroll={(e) => {
+            onScroll(e.target.scrollTop);
+            // Sync header scroll X if needed, but header seems to rely on body scroll? 
+            // Actually usually header needs to sync X with body. 
+            // Let's assume X sync is handled or standard behavior for now, focus on Y for sidebar.
+            const header = document.getElementById('calendar-header');
+            if(header) header.scrollLeft = e.target.scrollLeft;
+        }}
+    >
         <div id="calendar-grid" class="relative min-w-max">
             <!-- 1. Grid Background Layer (Managed by Vanilla JS) -->
             <div id="grid-background-layer" class="absolute inset-0 z-0">

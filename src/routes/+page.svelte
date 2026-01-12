@@ -8,6 +8,7 @@
             // === 1. TOP LEVEL STATE ===
             let tasks = $state([]);
             let lines = $state([]);
+            let sidebar; // Sidebar instance binding
             
             // === 2. MOCK DATA & CONSTANTS ===
             const MOCK_LINES = [
@@ -19,6 +20,18 @@
                 { id: 'line-6', name: 'Line 06 (Sewing)' },
                 { id: 'line-7', name: 'Line 07 (Finishing)' },
                 { id: 'line-8', name: 'Line 08' },
+                { id: 'line-9', name: 'Line 09' },
+                { id: 'line-10', name: 'Line 10' },
+                { id: 'line-11', name: 'Line 11' },
+                { id: 'line-12', name: 'Line 12' },
+                { id: 'line-13', name: 'Line 13' },
+                { id: 'line-14', name: 'Line 14' },
+                { id: 'line-15', name: 'Line 15' },
+                { id: 'line-16', name: 'Line 16' },
+                { id: 'line-17', name: 'Line 17' },
+                { id: 'line-18', name: 'Line 18' },
+                { id: 'line-19', name: 'Line 19' },
+                { id: 'line-20', name: 'Line 20' },
             ];
         
             const MOCK_TASKS = [
@@ -159,9 +172,10 @@
             });
         </script>
 
-    <div id="app" class="flex h-screen w-full">
+    <div id="app" class="flex h-screen w-full overflow-hidden">
         <!-- === Left Sticky Sidebar (Line Names) === -->
         <Sidebar 
+            bind:this={sidebar}
             {lines} 
             rowHeight={ROW_HEIGHT} 
             onDateChange={handleDateChange} 
@@ -174,6 +188,9 @@
             {lines} 
             {today} 
             {holidays} 
+            onScroll={(scrollTop) => {
+                if (sidebar) sidebar.setScrollTop(scrollTop);
+            }} 
         />
     </div>
 
