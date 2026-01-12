@@ -16,7 +16,7 @@
     
     // Constants
     let NUM_DAYS_TO_SHOW = 60;
-    const DAY_COLUMN_WIDTH = 200;
+    const DAY_COLUMN_WIDTH = 100;
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
     const START_HOUR = 8;
@@ -519,6 +519,8 @@
                     const cellId = `cell-${line.id}-${formatDate(day.date, 'YYYY-MM-DD')}`;
                     const cell = document.createElement('div');
                     cell.id = cellId;
+
+
                     
                     const workHours = getLineWorkHours(day.date, line.id);
                     // Determine colors

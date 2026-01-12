@@ -51,7 +51,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     id="{task.id}-task"
-    class="task absolute bg-blue-600 border border-blue-800 rounded-lg p-2 text-white shadow-md overflow-hidden cursor-grab active:cursor-grabbing z-10 pointer-events-auto"
+    class="task absolute bg-blue-600 border border-blue-800 rounded-md px-1 py-0.5 text-white shadow-sm overflow-hidden cursor-grab active:cursor-grabbing z-10 pointer-events-auto flex items-center space-x-1"
     style="{style}"
     draggable="true"
     ondragstart={handleDragStart}
@@ -61,9 +61,8 @@
     onmouseleave={handleMouseLeave}
     data-task-id={task.id}
 >
-    <div class="font-bold text-sm truncate">{task.orderId}</div>
-    <div class="text-xs truncate">{task.style}</div>
-    <div class="text-xs truncate">Qty: {task.quantity}</div>
+    <div class="font-bold text-[10px] leading-tight truncate">{task.orderId}</div>
+    <div class="text-[9px] leading-tight truncate opacity-90">{task.style}</div>
 </div>
 
 <style>
