@@ -17,8 +17,8 @@
     // Constants
     let NUM_DAYS_TO_SHOW = 60;
     const DAY_COLUMN_WIDTH = 200;
-    const ROW_HEIGHT = 100;
-    const FOOTER_HEIGHT = 24;
+    const ROW_HEIGHT = 36;
+    const FOOTER_HEIGHT = 0; // Removed footer for compactness
     const START_HOUR = 8;
     const END_HOUR = 18;
 
@@ -137,11 +137,14 @@
         const width = endPixel - startPixel;
         if (width <= 0) return '';
 
-        const top = (lineIndex * ROW_HEIGHT) + 10;
-        const height = ROW_HEIGHT - FOOTER_HEIGHT - 10;
+        // NEW: Slimmer tasks
+        const top = (lineIndex * ROW_HEIGHT) + 8; // More padding top
+        const height = ROW_HEIGHT - 16; // Leaves 8px padding bottom (approx 20px height)
         
         return `left: ${startPixel}px; top: ${top}px; width: ${width}px; height: ${height}px;`;
     }
+
+
 
     function calculateNewEndDate(newStartDate, workDurationMinutes, lineId) {
         let minutesToDistribute = workDurationMinutes;
@@ -544,12 +547,12 @@
                     cell.dataset.date = formatDate(day.date, 'YYYY-MM-DD');
                     cell.dataset.isBlocked = day.isBlocked;
                     
-                    // Add Label at bottom
+                    // Add Label (CENTERED)
                     if (!day.isBlocked && workHours > 0) {
                         const label = document.createElement('div');
-                        label.className = "absolute bottom-0 left-0 w-full bg-blue-50 border-t border-gray-100 flex items-center justify-center text-xs text-blue-800 pointer-events-none select-none";
-                        label.style.height = `${FOOTER_HEIGHT}px`;
-                        label.innerText = `${workHours} hrs`;
+                        // Changed: inset-0, flex centered, opacity for subtle look
+                        label.className = "absolute inset-0 w-full flex items-center justify-center text-xs text-blue-800 pointer-events-none select-none opacity-25 font-bold tracking-widest";
+                        label.innerText = `${workHours}H`;
                         cell.appendChild(label);
                     }
 
@@ -616,7 +619,7 @@
     <!-- Calendar Body (Planning Grid) -->
     <div 
         id="calendar-body" 
-        class="flex-1 calendar-scroll overflow-auto"
+        class="flex-1 overflow-auto custom-scrollbar"
         onscroll={(e) => {
             onScroll(e.target.scrollTop);
             // Sync header scroll X if needed, but header seems to rely on body scroll? 

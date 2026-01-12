@@ -60,7 +60,7 @@
     >
         {#each lines as line (line.id)}
             <div 
-                class="flex items-center p-4 border-b border-gray-200"
+                class="flex items-center px-4 border-b border-gray-200 text-sm font-medium text-gray-700"
                 style="height: {rowHeight}px;"
             >
                 {line.name}

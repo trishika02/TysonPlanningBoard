@@ -91,7 +91,7 @@
             let holidays = [...MOCK_HOLIDAYS];
             let today = $state(new Date(new Date().setHours(0, 0, 0, 0)));
         
-            const ROW_HEIGHT = 100;
+            const ROW_HEIGHT = 36;
         
             // === 5. EVENT HANDLERS ===
             
