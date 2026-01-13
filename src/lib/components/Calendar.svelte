@@ -226,38 +226,13 @@
         const taskStart = new Date(task.start);
         const taskEnd = new Date(task.end);
         
-        draggedTaskDuration = 0; 
-        let tempDate = new Date(taskStart);
-        tempDate.setHours(0,0,0,0); 
-        
-        // This duration calc assumes context of the orginal line? 
-        // Or absolute duration?
-        // Let's calculate absolute work minutes based on original line's schedule.
-        
-        while(tempDate < taskEnd) {
-            const dateStr = formatDate(tempDate, 'YYYY-MM-DD');
-            const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
-            const workHours = getLineWorkHours(tempDate, originalLineId);
-
-            if (day && !day.isBlocked && workHours > 0) {
-                const dayWorkStart = new Date(day.date);
-                dayWorkStart.setHours(START_HOUR, 0, 0, 0);
-                const dayWorkEnd = new Date(dayWorkStart.getTime() + workHours * 60 * 60000);
-
-                const segmentStart = new Date(Math.max(taskStart.getTime(), dayWorkStart.getTime()));
-                const segmentEnd = new Date(Math.min(taskEnd.getTime(), dayWorkEnd.getTime()));
-
-                if (segmentEnd > segmentStart) {
-                    draggedTaskDuration += (segmentEnd.getTime() - segmentStart.getTime()) / (1000 * 60);
-                }
-            }
-            tempDate.setDate(tempDate.getDate() + 1);
-        }
+        // ABSOLUTE DURATION: Simple difference
+        const durationMs = taskEnd.getTime() - taskStart.getTime();
         
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', JSON.stringify({
             id: draggedTaskId,
-            durationMinutes: draggedTaskDuration,
+            durationMs: durationMs,
             taskOffsetLeft: taskOffsetLeft
         }));
         
@@ -293,7 +268,7 @@
         const data = e.dataTransfer.getData('text/plain');
         if (!data) return; 
         
-        const { id: droppedTaskId, durationMinutes: workDurationMinutes, taskOffsetLeft } = JSON.parse(data);
+        const { id: droppedTaskId, durationMs, taskOffsetLeft } = JSON.parse(data);
         const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
         const workHours = getLineWorkHours(new Date(dateStr), newLineId);
         
@@ -316,7 +291,9 @@
         newStartDate.setHours(START_HOUR);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
-        const newEndDate = calculateNewEndDate(newStartDate, workDurationMinutes, newLineId);
+        // Simple End Date Calculation
+        const newEndDate = new Date(newStartDate.getTime() + durationMs);
+        
         const hasOverlap = isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate);
         
         const startPixel = getPixelOffsetForDate(newStartDate, newLineId);
@@ -381,7 +358,7 @@
         const dateStr = targetCell.dataset.date;
         const isBlocked = targetCell.dataset.isBlocked === 'true';
 
-        const { id: droppedTaskId, durationMinutes: workDurationMinutes, taskOffsetLeft } = JSON.parse(e.dataTransfer.getData('text/plain'));
+        const { id: droppedTaskId, durationMs, taskOffsetLeft } = JSON.parse(e.dataTransfer.getData('text/plain'));
 
         if (isBlocked) {
             console.warn("Cannot drop on a blocked day!");
@@ -407,7 +384,8 @@
         newStartDate.setHours(START_HOUR);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
-        let newEndDate = calculateNewEndDate(newStartDate, workDurationMinutes, newLineId);
+        // Simple End Date Calculation
+        const newEndDate = new Date(newStartDate.getTime() + durationMs);
 
         if (isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate)) {
             console.warn("DROP REJECTED: Task would overlap with another task.");
