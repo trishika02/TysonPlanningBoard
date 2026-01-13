@@ -456,6 +456,8 @@
 
         // 1. Clear CALENDAR HEADER
         calendarDates.innerHTML = '';
+        const calendarMonths = document.getElementById('calendar-months');
+        if (calendarMonths) calendarMonths.innerHTML = '';
 
         // 2. Clear GRID BACKGROUND ONLY
         const gridBackgroundLayer = document.getElementById('grid-background-layer');
@@ -487,25 +489,71 @@
         }
         calendarDays = tempDays;
 
+        // Render Months (NEW)
+        if (calendarMonths) {
+            let currentMonthLabel = '';
+            let currentMonthSpan = 0;
+            let currentMonthStartIndex = 0;
+
+            calendarDays.forEach((day, index) => {
+                const monthLabel = formatDate(day.date, 'MMM YYYY');
+                
+                if (monthLabel !== currentMonthLabel) {
+                    if (currentMonthLabel) {
+                        // Render previous month block
+                        const monthEl = document.createElement('div');
+                        monthEl.className = 'flex-shrink-0 flex items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-600 font-bold text-sm uppercase tracking-wider sticky left-0'; // sticky left might conflict if not handled, removing sticky for now as it scrolls
+                        monthEl.className = 'flex-shrink-0 flex items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-600 font-bold text-sm uppercase tracking-wider';
+                        monthEl.style.width = `${currentMonthSpan * DAY_COLUMN_WIDTH}px`;
+                        monthEl.innerText = currentMonthLabel;
+                        calendarMonths.appendChild(monthEl);
+                    }
+                    currentMonthLabel = monthLabel;
+                    currentMonthSpan = 0;
+                    currentMonthStartIndex = index;
+                }
+                currentMonthSpan++;
+
+                // If last day, render current block
+                if (index === calendarDays.length - 1) {
+                    const monthEl = document.createElement('div');
+                    monthEl.className = 'flex-shrink-0 flex items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-600 font-bold text-sm uppercase tracking-wider';
+                    monthEl.style.width = `${currentMonthSpan * DAY_COLUMN_WIDTH}px`;
+                    monthEl.innerText = currentMonthLabel;
+                    calendarMonths.appendChild(monthEl);
+                }
+            });
+            
+            // Add space for Load More button in month row to align?
+            // "Load More" takes up space in dates row. 
+            // To align borders, we might want a placeholder or just let it be empty/gray.
+            // Let's add a spacer matching the load more button width: 120px
+            const spacer = document.createElement('div');
+            spacer.style.width = '120px';
+            spacer.className = 'flex-shrink-0 border-r border-gray-200 bg-gray-50';
+            calendarMonths.appendChild(spacer);
+        }
+
         // Render Dates
         calendarDays.forEach((day) => {
             const dateEl = document.createElement('div');
-            dateEl.className = `flex-shrink-0 text-center border-l border-b border-gray-200 p-2 ${day.isBlocked ? 'bg-gray-200 text-gray-500' : 'bg-white'} ${day.isToday ? 'bg-blue-100' : ''}`;
+            // Adjusted styles for half height: h-12 is approx 48px. 
+            // Removed MMM YYYY from date cell since it's above now.
+            dateEl.className = `flex-shrink-0 text-center border-r border-gray-200 flex flex-col justify-center items-center ${day.isBlocked ? 'bg-gray-100 text-gray-500' : 'bg-white'} ${day.isToday ? 'bg-blue-50' : ''}`;
             dateEl.style.width = `${DAY_COLUMN_WIDTH}px`;
-            // Simplified Header - removing work hours here as requested it's now per cell
+            dateEl.style.height = '100%'; // Full height of the row container (h-12)
+
             dateEl.innerHTML = `
-                <div class="font-semibold text-sm ${day.isToday ? 'text-blue-700' : 'text-gray-800'}">
-                    ${formatDate(day.date, 'ddd')}
+                <div class="flex items-baseline space-x-1">
+                    <span class="text-xl font-bold ${day.isToday ? 'text-blue-900' : 'text-gray-900'}">
+                        ${day.date.getDate()}
+                    </span>
+                    <span class="font-semibold text-xs uppercase ${day.isToday ? 'text-blue-700' : 'text-gray-500'}">
+                        ${formatDate(day.date, 'ddd')}
+                    </span>
                 </div>
-                <div class="text-xl font-bold ${day.isToday ? 'text-blue-900' : 'text-gray-900'}">
-                    ${day.date.getDate()}
-                </div>
-                <div class="text-xs text-gray-500">
-                    ${formatDate(day.date, 'MMM YYYY')}
-                </div>
-                <div class="text-xs font-medium mt-1 ${day.isBlocked ? 'text-red-600' : 'hidden'}">
-                    ${day.isBlocked ? (day.isHoliday ? 'Holiday' : 'Weekend') : ''}
-                </div>
+                <!-- Optional: blocked status small text or icon? -->
+                ${day.isBlocked ? `<div class="text-[10px] uppercase font-bold text-red-400 leading-none mt-1">${day.isHoliday ? 'Holiday' : 'Weekend'}</div>` : ''}
             `;
             calendarDates.appendChild(dateEl);
         });
@@ -566,15 +614,14 @@
 
         // Load More Button
         const loadMoreButton = document.createElement('div');
-        loadMoreButton.className = `flex-shrink-0 text-center border-l border-b border-gray-200 p-2 bg-gray-50 hover:bg-gray-100 cursor-pointer flex flex-col justify-center items-center`;
+        loadMoreButton.className = `flex-shrink-0 text-center border-r border-gray-200 bg-gray-50 hover:bg-gray-100 cursor-pointer flex flex-col justify-center items-center`;
         loadMoreButton.style.width = `120px`; 
         loadMoreButton.innerHTML = `
             <div class="font-semibold text-sm text-blue-600">Load More</div>
-            <div class="text-xs text-gray-500 mt-2">(${NUM_DAYS_TO_SHOW} days shown)</div>
+            <div class="text-xs text-gray-500 mt-1">(${NUM_DAYS_TO_SHOW} days)</div>
         `;
         loadMoreButton.addEventListener('click', () => {
             NUM_DAYS_TO_SHOW += 30; 
-            // We removed loadingModal reference here to avoid errors if not passed
             setTimeout(() => renderBoard(), 50); 
         });
         calendarDates.appendChild(loadMoreButton);
@@ -610,11 +657,32 @@
 </script>
 
 <div id="main-content" class="flex-1 flex flex-col h-full overflow-hidden">
+    <!-- Calendar Static Toolbar (Top Row) -->
+    <div id="calendar-toolbar" class="flex-shrink-0 h-12 border-b border-gray-200 bg-white flex items-center justify-end px-4 z-20 relative">
+        <!-- Right: Search Bar -->
+        <div class="relative group">
+                <input 
+                type="text" 
+                placeholder="Search..." 
+                class="text-xs pl-8 pr-3 py-1.5 border border-gray-200 bg-gray-50 rounded-full w-32 focus:w-48 transition-all focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 shadow-sm"
+            >
+            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2 group-focus-within:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+        </div>
+    </div>
+
     <!-- Calendar Header (Dates) -->
     <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow z-10 h-24 overflow-hidden">
-        <!-- Header row for dates -->
-        <div id="calendar-dates" class="flex h-full">
-            <!-- Date columns will be injected by JS -->
+        <div class="flex flex-col h-full w-max">
+            <!-- Row 2: Months -->
+            <div id="calendar-months" class="flex h-12 border-b border-gray-200">
+                <!-- JS Injected -->
+            </div>
+            <!-- Row 3: Dates -->
+            <div id="calendar-dates" class="flex h-12">
+                 <!-- JS Injected -->
+            </div>
         </div>
     </div>
 

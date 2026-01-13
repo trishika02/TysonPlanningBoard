@@ -30,26 +30,42 @@
 
 <div id="sidebar" class="sticky-sidebar flex-shrink-0 bg-white shadow-lg z-20 flex flex-col h-full w-64 border-r border-gray-200">
     <!-- Sidebar Header -->
-    <div class="sidebar-header h-24 border-b border-gray-200 flex sticky-header bg-white flex-shrink-0 z-30">
-        <!-- Floor Header -->
-        <div class="w-16 border-r border-gray-200 flex flex-col items-center justify-center font-bold text-xs uppercase text-gray-500 bg-gray-50 p-2 text-center">
-            Floor
-        </div>
-        <!-- Line Header + Controls -->
-        <div class="flex-1 flex flex-col justify-center p-2 bg-white">
-            <h2 class="text-sm font-bold text-gray-800 text-center mb-1">Lines</h2>
-            <!-- Mini Date Controls -->
-             <div class="flex space-x-1 justify-center">
+    <!-- Sidebar Header (3 Rows) -->
+    <div class="sidebar-header h-36 border-b border-gray-200 flex flex-col sticky-header bg-white flex-shrink-0 z-30">
+        
+        <!-- ROW 1 (Top): Date Selector -->
+        <div class="h-12 w-full border-b border-gray-200 flex items-center justify-start px-4 bg-white">
+            <!-- Left: Date Selector -->
+             <div class="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 border border-gray-200 hover:border-blue-300 transition-colors">
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 <input 
                     type="date" 
                     id="date-picker" 
-                    class="text-[10px] p-0.5 border rounded w-20"
+                    class="text-xs bg-transparent border-none p-0 text-gray-700 font-medium focus:ring-0 cursor-pointer w-24"
                     bind:value={dateValue}
+                    placeholder="Select Date"
                 >
                 <button 
                     onclick={handleDateGo}
-                    class="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded"
-                >Go</button>
+                    class="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 px-1"
+                >GO</button>
+            </div>
+        </div>
+
+        <!-- ROW 2 (Middle): Date Range Label -->
+        <div class="h-12 w-full border-b border-gray-200 flex items-center justify-center bg-gray-50/50">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Date Range</span>
+        </div>
+
+        <!-- ROW 3 (Bottom): Titles (Floor | Lines) -->
+        <div class="h-12 w-full flex">
+             <!-- Floor Header -->
+            <div class="w-16 border-r border-gray-200 flex flex-col items-center justify-center font-bold text-xs uppercase text-gray-500 bg-gray-50 p-2 text-center h-full">
+                Floor
+            </div>
+            <!-- Line Header -->
+            <div class="flex-1 flex flex-col items-center justify-center p-2 bg-white h-full">
+                <h2 class="text-sm font-bold text-gray-800 text-center">Lines</h2>
             </div>
         </div>
     </div>
