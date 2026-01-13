@@ -85,37 +85,22 @@
     }
 
     function getPixelOffsetForDate(date, lineId) {
+        if (!calendarDays.length) return 0;
+
+        const calendarStart = new Date(calendarDays[0].date);
+        // Normalize to start of day? No, keep time precision for accurate linear mapping
+        // calendarStart is likely 00:00 if constructed that way.
+        // Let's ensure strict linear mapping based on timestamps.
+        
         const dateObj = new Date(date);
-        const dateStr = formatDate(dateObj, 'YYYY-MM-DD');
-        const dayIndex = calendarDays.findIndex(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
         
-        // Not on calendar
-        if (dayIndex === -1) return null;
-
-        const day = calendarDays[dayIndex];
-        const workHours = getLineWorkHours(day.date, lineId);
+        // Calculate difference in milliseconds
+        const diffMs = dateObj.getTime() - calendarStart.getTime();
         
-        // If date is on a blocked day, we can't calculate a time-based offset.
-        if (day.isBlocked || workHours === 0) {
-            // Snap to the start of the day block
-            return dayIndex * DAY_COLUMN_WIDTH;
-        }
-
-        const totalWorkMinutes = workHours * 60;
-        const dayWorkStart = new Date(day.date);
-        dayWorkStart.setHours(START_HOUR, 0, 0, 0);
-
-        const dayWorkEnd = new Date(dayWorkStart.getTime() + totalWorkMinutes * 60000);
-
-        // Clamp task time to workday
-        const effectiveTime = new Date(Math.max(dayWorkStart.getTime(), Math.min(dayWorkEnd.getTime(), dateObj.getTime())));
-
-        let taskOffsetMinutes = (effectiveTime.getTime() - dayWorkStart.getTime()) / (1000 * 60);
-
-        const leftPercent = (taskOffsetMinutes / totalWorkMinutes);
-        const leftPixelOffset = leftPercent * DAY_COLUMN_WIDTH;
-
-        return (dayIndex * DAY_COLUMN_WIDTH) + leftPixelOffset;
+        // Convert to days (float)
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        
+        return diffDays * DAY_COLUMN_WIDTH;
     }
 
     function getTaskStyle(task) {
@@ -138,8 +123,8 @@
         if (width <= 0) return '';
 
         // NEW: Slimmer tasks
-        const top = (lineIndex * ROW_HEIGHT) + 8; // More padding top
-        const height = ROW_HEIGHT - 16; // Leaves 8px padding bottom (approx 20px height)
+        const top = (lineIndex * ROW_HEIGHT) + 4; // 4px padding top
+        const height = ROW_HEIGHT - 8; // 4px padding bottom, total 8px gap
         
         return `left: ${startPixel}px; top: ${top}px; width: ${width}px; height: ${height}px;`;
     }

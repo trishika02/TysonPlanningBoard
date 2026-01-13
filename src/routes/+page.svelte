@@ -53,8 +53,11 @@
                     orderId: 'PO-4567',
                     style: 'T-Shirt (Red)',
                     quantity: 5000,
-                    start: '2025-11-01T09:00:00',
-                    end: '2025-11-01T13:30:00'
+                    start: '2026-01-04T09:00:00',
+                    end: '2026-01-11T13:30:00',
+                    total_days: 10,
+                    completed_days: 3,
+                    completed_quantity: 1500,
                 },
                 {
                     id: 'task-102',
@@ -62,35 +65,11 @@
                     orderId: 'PO-4568',
                     style: 'Polo (Blue)',
                     quantity: 3000,
-                    start: '2025-11-01T14:00:00',
-                    end: '2025-11-01T17:00:00'
-                },
-                {
-                    id: 'task-103',
-                    lineId: 'line-2',
-                    orderId: 'PO-4569',
-                    style: 'Jeans (Black)',
-                    quantity: 1200,
-                    start: '2025-11-03T09:00:00',
-                    end: '2025-11-06T17:00:00'
-                },
-                {
-                    id: 'task-104',
-                    lineId: 'line-3',
-                    orderId: 'PO-4570',
-                    style: 'Jacket (Denim)',
-                    quantity: 250,
-                    start: '2025-11-03T11:30:00',
-                    end: '2025-11-03T16:00:00'
-                },
-                {
-                    id: 'task-105',
-                    lineId: 'line-4',
-                    orderId: 'PO-4571',
-                    style: 'Shorts (Cargo)',
-                    quantity: 800,
-                    start: '2025-11-05T10:00:00',
-                    end: '2025-11-05T18:00:00'
+                    start: '2026-01-05T14:00:00',
+                    end: '2026-01-15T17:00:00',
+                    total_days:15,
+                    completed_days:5,
+                    completed_quantity:1500,
                 }
             ];
         
@@ -101,9 +80,10 @@
             ];
         
             let holidays = [...MOCK_HOLIDAYS];
-            let today = $state(new Date(new Date().setHours(0, 0, 0, 0)));
+            // Start view from Jan 1, 2026 to see the tasks
+            let today = $state(new Date('2026-01-01T00:00:00'));
         
-            const ROW_HEIGHT = 36;
+    const ROW_HEIGHT = 36;
         
             // === 5. EVENT HANDLERS ===
             
@@ -149,26 +129,7 @@
             }
         
             function alignMockDataToToday() {
-                 const todayStr = formatDate(today, 'YYYY-MM-DD');
-                 // 4 days from today
-                 const fourDaysFromToday = new Date(today);
-                 fourDaysFromToday.setDate(today.getDate() + 4);
-                 const fourDaysFromTodayStr = formatDate(fourDaysFromToday, 'YYYY-MM-DD');
-                 const sevenDaysFromToday = new Date(today);
-                 sevenDaysFromToday.setDate(today.getDate() + 7);
-                 const sevenDaysFromTodayStr = formatDate(sevenDaysFromToday, 'YYYY-MM-DD');
-                 
-                 // Mutate state
-                 const task101 = tasks.find(t => t.id === 'task-101');
-                 if (task101) {
-                     task101.start = `${todayStr}T09:00:00`;
-                     task101.end = `${fourDaysFromTodayStr}T13:30:00`;
-                 }
-                 const task102 = tasks.find(t => t.id === 'task-102');
-                 if (task102) {
-                     task102.start = `${fourDaysFromTodayStr}T14:00:00`;
-                     task102.end = `${sevenDaysFromTodayStr}T17:00:00`;
-                 }
+                 // DISABLED: Keeping user predefined dates
             }
                 
             onMount(() => {
@@ -190,9 +151,9 @@
                 tasks = [...MOCK_TASKS];
         
                 // Initial setup
-                setTimeout(() => {
+                /*setTimeout(() => {
                     alignMockDataToToday();
-                }, 500);
+                }, 500);*/
         
             });
         </script>
