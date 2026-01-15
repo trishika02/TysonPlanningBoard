@@ -49,6 +49,11 @@
                     onclick={handleDateGo}
                     class="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800 px-1"
                 >GO</button>
+                <span class="text-gray-300">|</span>
+                <button 
+                    onclick={handleReset}
+                    class="text-[10px] uppercase font-bold text-green-600 hover:text-green-800 px-1"
+                >TODAY</button>
             </div>
         </div>
 
