@@ -14,13 +14,32 @@
     // Internal State
     let calendarDays = $state([]);
     
-    // Constants
-    let NUM_DAYS_TO_SHOW = 60;
+    // Constants - Default: 30 days before and 30 days after today (60 days total)
+    let daysBefore = $state(30);  // Days before today
+    let daysAfter = $state(30);   // Days after today
     const DAY_COLUMN_WIDTH = 100;
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
     const START_HOUR = 8;
     const END_HOUR = 18;
+
+    // Functions to load more days
+    function loadEarlierDays() {
+        daysBefore += 30;
+        renderBoard();
+    }
+
+    function loadLaterDays() {
+        daysAfter += 30;
+        renderBoard();
+    }
+
+    // Reset to today view (today + 30 days) - called when TODAY is clicked
+    export function resetToToday() {
+        daysBefore = 0;
+        daysAfter = 30;
+        renderBoard();
+    }
 
     // Drag & Drop State
     let draggedTaskId = null;
@@ -428,11 +447,17 @@
             gridBackgroundLayer.innerHTML = '';
         }
         
-        // RE-POPULATE calendarDays
+        // RE-POPULATE calendarDays (centered on today with daysBefore and daysAfter)
         const tempDays = [];
-        const currentDate = new Date(today);
-        for (let i = 0; i < NUM_DAYS_TO_SHOW; i++) {
-            const date = new Date(currentDate);
+        const totalDays = daysBefore + daysAfter + 1; // +1 for today itself
+        
+        // Start from daysBefore days before today
+        const startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - daysBefore);
+        
+        for (let i = 0; i < totalDays; i++) {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
             const dayOfWeek = date.getDay();
             const workHours = getStandardWorkHours(dayOfWeek); 
             // NOTE: workHours here is just for "is it weekend?", line specific hours overrides this.
@@ -440,15 +465,19 @@
             const isWeekend = workHours === 0;
             const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
             const isBlocked = isWeekend || isHoliday;
+            
+            // Check if this date is today
+            const todayDateStr = formatDate(today, 'YYYY-MM-DD');
+            const thisDateStr = formatDate(date, 'YYYY-MM-DD');
+            const isToday = todayDateStr === thisDateStr;
 
             tempDays.push({
                 date,
                 dayOfWeek,
                 // workHours, // REMOVE THIS from global day object to avoid confusion
                 isBlocked,
-                isToday: i === 0
+                isToday
             });
-            currentDate.setDate(currentDate.getDate() + 1);
         }
         calendarDays = tempDays;
 
@@ -465,7 +494,6 @@
                     if (currentMonthLabel) {
                         // Render previous month block
                         const monthEl = document.createElement('div');
-                        monthEl.className = 'flex-shrink-0 flex items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-600 font-bold text-sm uppercase tracking-wider sticky left-0'; // sticky left might conflict if not handled, removing sticky for now as it scrolls
                         monthEl.className = 'flex-shrink-0 flex items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-600 font-bold text-sm uppercase tracking-wider';
                         monthEl.style.width = `${currentMonthSpan * DAY_COLUMN_WIDTH}px`;
                         monthEl.innerText = currentMonthLabel;
@@ -486,15 +514,6 @@
                     calendarMonths.appendChild(monthEl);
                 }
             });
-            
-            // Add space for Load More button in month row to align?
-            // "Load More" takes up space in dates row. 
-            // To align borders, we might want a placeholder or just let it be empty/gray.
-            // Let's add a spacer matching the load more button width: 120px
-            const spacer = document.createElement('div');
-            spacer.style.width = '120px';
-            spacer.className = 'flex-shrink-0 border-r border-gray-200 bg-gray-50';
-            calendarMonths.appendChild(spacer);
         }
 
         // Render Dates
@@ -575,20 +594,6 @@
             gridBackgroundLayer.appendChild(gridCellsFrag);
         }
 
-        // Load More Button
-        const loadMoreButton = document.createElement('div');
-        loadMoreButton.className = `flex-shrink-0 text-center border-r border-gray-200 bg-gray-50 hover:bg-gray-100 cursor-pointer flex flex-col justify-center items-center`;
-        loadMoreButton.style.width = `120px`; 
-        loadMoreButton.innerHTML = `
-            <div class="font-semibold text-sm text-blue-600">Load More</div>
-            <div class="text-xs text-gray-500 mt-1">(${NUM_DAYS_TO_SHOW} days)</div>
-        `;
-        loadMoreButton.addEventListener('click', () => {
-            NUM_DAYS_TO_SHOW += 30; 
-            setTimeout(() => renderBoard(), 50); 
-        });
-        calendarDates.appendChild(loadMoreButton);
-
         addDragDropListeners(); 
     }
 
@@ -621,7 +626,30 @@
 
 <div id="main-content" class="flex-1 flex flex-col h-full overflow-hidden">
     <!-- Calendar Static Toolbar (Top Row) -->
-    <div id="calendar-toolbar" class="flex-shrink-0 h-12 border-b border-gray-200 bg-white flex items-center justify-end px-4 z-20 relative">
+    <div id="calendar-toolbar" class="flex-shrink-0 h-12 border-b border-gray-200 bg-white flex items-center justify-between px-4 z-20 relative">
+        <!-- Left: Load Earlier/Later Buttons -->
+        <div class="flex items-center gap-2">
+            <button 
+                onclick={loadEarlierDays}
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full border border-blue-200 transition-colors"
+            >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Earlier
+            </button>
+            <span class="text-xs text-gray-400">+30 days</span>
+            <button 
+                onclick={loadLaterDays}
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full border border-blue-200 transition-colors"
+            >
+                Later
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        </div>
+
         <!-- Right: Search Bar -->
         <div class="relative group">
                 <input 

@@ -11,6 +11,7 @@
             let lines = $state([]);
             let showUnplanned = $state(false); // State for toggling unplanned panel
             let sidebar; // Sidebar instance binding
+            let calendar; // Calendar instance binding
             
             // === 2. MOCK DATA & CONSTANTS ===
             const MOCK_FLOORS_LINES = [
@@ -79,27 +80,27 @@
             let unplannedTasks = $state([
                 {
                     id: 'task-103',
-                    lineId: 'line-3',
+                    lineId: '',
                     orderId: 'PO-4569',
                     style: 'T-Shirt (Blue)',
                     quantity: 2000,
-                    start: ' ',
-                    end: ' ',
-                    total_days: 0,
-                    total_working_days: 0,
+                    start: '2026-02-20T01:00:00',
+                    end: '2026-02-25T05:00:00',
+                    total_days: 5,
+                    total_working_days: 4,
                     completed_days: 0,
                     completed_quantity: 0,
                 },
                 {
                     id: 'task-104',
-                    lineId: 'line-4',
+                    lineId: '',
                     orderId: 'PO-4570',
                     style: 'Polo (Green)',
                     quantity: 2000,
-                    start: ' ',
-                    end: ' ',
-                    total_days: 0,
-                    total_working_days: 0,
+                    start: '2026-01-20T14:00:00',
+                    end: '2026-01-30T17:00:00',
+                    total_days: 11,
+                    total_working_days: 8,
                     completed_days: 0,
                     completed_quantity: 0,
                 },
@@ -116,6 +117,15 @@
             let today = $state(new Date('2026-01-01T00:00:00'));
         
     const ROW_HEIGHT = 36;
+
+            // === TIMEZONE HELPER for GMT+6 (Bangladesh) ===
+            function getLocalDate() {
+                // Get current time in GMT+6 (Bangladesh timezone)
+                const now = new Date();
+                // Create a date using local year, month, day to avoid timezone issues
+                const localDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+                return localDate;
+            }
         
             // === 5. EVENT HANDLERS ===
             
@@ -125,10 +135,10 @@
                 if (modal) modal.style.display = 'flex';
                 
                 requestAnimationFrame(() => {
-                    const newDate = new Date(newDateStr + 'T00:00:00'); // Use local time
-                    let t = newDate;
-                    t.setHours(0, 0, 0, 0);
-                    today = t; // Update state
+                    // Parse the date string as local date (YYYY-MM-DD format)
+                    const [year, month, day] = newDateStr.split('-').map(Number);
+                    const newDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+                    today = newDate; // Update state
                     
                     setTimeout(() => {
                         if (modal) modal.style.display = 'none';
@@ -141,9 +151,11 @@
                 if (modal) modal.style.display = 'flex';
                 
                 requestAnimationFrame(() => {
-                    const newToday = new Date();
-                    newToday.setHours(0, 0, 0, 0);
-                    today = newToday;
+                    // Use local date helper to get correct Bangladesh date
+                    today = getLocalDate();
+                    
+                    // Reset calendar to minimal view (today + 3 days)
+                    if (calendar) calendar.resetToToday();
                     
                     setTimeout(() => {
                         if (modal) modal.style.display = 'none';
@@ -164,14 +176,20 @@
                  // DISABLED: Keeping user predefined dates
             }
 
-            function addToBoard(task) {
+            function addToBoard(task, targetLineId = null) {
                 // Remove from unplanned
                 unplannedTasks = unplannedTasks.filter(t => t.id !== task.id);
                 
-                // Set start date to current 'today' view date at 09:00
-                const startDate = new Date(today);
-                startDate.setHours(9, 0, 0, 0);
-                task.start = startDate.toISOString().replace('Z', '');
+                // Set the lineId dynamically (from drag-drop or default to first line)
+                if (targetLineId) {
+                    task.lineId = targetLineId;
+                } else if (!task.lineId || task.lineId === '') {
+                    // Default to first available line if no target specified
+                    task.lineId = lines.length > 0 ? lines[0].id : 'line-1';
+                }
+                
+                // Keep existing start/end dates (they are already defined in unplanned tasks)
+                // No need to modify them
                 
                 // Add to main tasks
                 tasks.push(task);
@@ -216,6 +234,7 @@
 
         <!-- === Main Content (Scrollable Calendar) === -->
         <Calendar 
+            bind:this={calendar}
             bind:tasks 
             {lines} 
             {today} 
