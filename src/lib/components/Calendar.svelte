@@ -567,7 +567,7 @@
                     if (!day.isBlocked && workHours > 0) {
                         const label = document.createElement('span');
                         label.className = "text-[9px] font-bold text-gray-500 uppercase tracking-tighter opacity-70";
-                        label.innerText = `${workHours} HOURS`;
+                        label.innerText = `${workHours} h`;
                         hoursArea.appendChild(label);
                     }
                     cell.appendChild(hoursArea);
