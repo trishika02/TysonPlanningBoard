@@ -14,7 +14,7 @@
 <div class="min-h-screen bg-gray-50 flex flex-col items-center">
 
 	<!-- Top Navigation Bar -->
-	<nav class="w-[80%] bg-white shadow-sm rounded-b-lg px-6 py-4 mb-6 flex justify-between items-center border border-gray-100">
+	<nav class="w-[90%] bg-white shadow-sm rounded-b-lg px-6 py-4 mb-6 flex justify-between items-center border border-gray-100">
 		<div class="flex items-center space-x-8">
 			<h1 class="text-xl font-bold text-gray-800 tracking-tight">AltarSense</h1>
 			<div class="flex space-x-2">
@@ -31,7 +31,7 @@
 	</nav>
 	
 	<!-- Main Application Body -->
-	<div class="w-[80%] bg-white rounded-xl shadow-lg border border-gray-200 flex-1 flex flex-col overflow-hidden mb-8 h-[80vh]">
+	<div class="w-[90%] bg-white rounded-xl shadow-lg border border-gray-200 flex-1 flex flex-col overflow-hidden mb-8 h-[80vh]">
 		{@render children()}
 	</div>
 	

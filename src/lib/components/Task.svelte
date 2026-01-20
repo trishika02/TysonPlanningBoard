@@ -20,23 +20,27 @@
         onDragEnd(e);
     }
 
-    function handleMouseEnter(e) {
+    function handleSegmentEnter(e, segment) {
+        e.stopPropagation();
+        const content = `
+            <strong>Segment:</strong> ${segment.qty} units<br>
+            <strong>Progress:</strong> ${Math.round((segment.qty / task.quantity) * 100)}%<br>
+            <span class="text-xs text-gray-400">Color: ${segment.color}</span>
+        `;
+        tooltipStore.show(e.pageX, e.pageY, content);
+    }
+
+    function handleRemainingEnter(e) {
         const startStr = formatDate(new Date(task.start), 'YYYY-MM-DD HH:mm');
         const endStr = formatDate(new Date(task.end), 'YYYY-MM-DD HH:mm');
-        
+        const remainingQty = task.quantity - (task.completed_quantity || 0);
         const content = `
             <strong>Order:</strong> ${task.orderId}<br>
-            <strong>Style:</strong> ${task.style}<br>
-            <strong>Qty:</strong> ${task.quantity}<br>
+            <strong>Remaining Qty:</strong> ${remainingQty}<br>
             <strong>Start:</strong> ${startStr}<br>
             <strong>End:</strong> ${endStr}
         `;
         tooltipStore.show(e.pageX, e.pageY, content);
-        console.log({
-            startStr,
-            endStr,
-        });
-        
     }
 
     function handleMouseMove(e) {
@@ -84,23 +88,50 @@
     draggable="true"
     ondragstart={handleDragStart}
     ondragend={handleDragEnd}
-    onmouseenter={handleMouseEnter}
+    onmouseenter={handleRemainingEnter}
     onmousemove={handleMouseMove}
     onmouseleave={handleMouseLeave}
     data-task-id={task.id}
 >
-    <!-- Content: Name Only -->
-    <div class="font-bold text-[10px] leading-tight truncate drop-shadow-md select-none">
-        {task.style}
-    </div>
-    
-    <!-- Quantity Progress (Bottom Strip) -->
-    {#if quantityPercent !== null}
+    <!-- Background Progress Segments (Full Height) -->
+    {#if task.completed_segments && task.completed_segments.length > 0}
+        <div class="absolute inset-0 w-full h-full flex overflow-hidden pointer-events-none">
+            {#each task.completed_segments as segment}
+                <div 
+                    class="{segment.color} h-full opacity-90 border-r border-white/10 hover:opacity-100 transition-opacity pointer-events-auto"
+                    style="width: {(segment.qty / task.quantity) * 100}%;"
+                    onmouseenter={(e) => handleSegmentEnter(e, segment)}
+                    onmousemove={handleMouseMove}
+                    onmouseleave={handleMouseLeave}
+                ></div>
+            {/each}
+        </div>
+    {:else if quantityPercent !== null}
+        <!-- Fallback for single segment if no segments defined -->
         <div 
-            class="absolute bottom-0 left-0 h-[50%] bg-green-400/50"
+            class="absolute inset-0 h-full bg-green-500/80 hover:bg-green-500 transition-colors pointer-events-auto"
             style="width: {quantityPercent}%;"
+            onmouseenter={(e) => handleSegmentEnter(e, { qty: task.completed_quantity, color: 'bg-green-500' })}
+            onmousemove={handleMouseMove}
+            onmouseleave={handleMouseLeave}
         ></div>
     {/if}
+
+    <!-- Content: Stats Row (Layered on top) -->
+    <div class="relative z-10 font-bold text-[11px] leading-tight flex items-center gap-1.5 whitespace-nowrap drop-shadow-lg select-none px-1.5 w-full pointer-events-none">
+        <span class="text-white uppercase font-extrabold tracking-tight">{task.style}</span>
+        <span class="text-white/30 font-normal">|</span>
+        <span class="text-white">{task.total_days}D</span>
+        <span class="text-white/30 font-normal">|</span>
+        <span class="flex items-center gap-0.5 text-white">
+            <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l5-5z" clip-rule="evenodd"></path></svg>
+            {quantityPercent ? Math.round(quantityPercent) : 0}%
+        </span>
+        <span class="text-white/30 font-normal">|</span>
+        <span class="text-white">
+            {task.total_days - (task.completed_days || 0)}D REM
+        </span>
+    </div>
 </div>
 
 <style>

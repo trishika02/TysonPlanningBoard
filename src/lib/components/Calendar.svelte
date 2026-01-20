@@ -13,11 +13,12 @@
 
     // Internal State
     let calendarDays = $state([]);
+    let currentVisibleMonth = $state(''); // Track current visible month based on scroll
     
     // Constants - Default: 30 days before and 30 days after today (60 days total)
     let daysBefore = $state(30);  // Days before today
     let daysAfter = $state(30);   // Days after today
-    const DAY_COLUMN_WIDTH = 100;
+    const DAY_COLUMN_WIDTH = 140; // Wider columns for better visibility
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
     const START_HOUR = 8;
@@ -141,9 +142,10 @@
         const width = endPixel - startPixel;
         if (width <= 0) return '';
 
-        // NEW: Slimmer tasks
-        const top = (lineIndex * ROW_HEIGHT) + 4; // 4px padding top
-        const height = ROW_HEIGHT - 8; // 4px padding bottom, total 8px gap
+        // NEW: Split row layout (Tasks in top 70%)
+        const TASK_HEIGHT_PERCENT = 0.7;
+        const top = (lineIndex * ROW_HEIGHT) + 2; // small 2px padding
+        const height = (ROW_HEIGHT * TASK_HEIGHT_PERCENT) - 4; // padding adjustment
         
         return `left: ${startPixel}px; top: ${top}px; width: ${width}px; height: ${height}px;`;
     }
@@ -438,8 +440,6 @@
 
         // 1. Clear CALENDAR HEADER
         calendarDates.innerHTML = '';
-        const calendarMonths = document.getElementById('calendar-months');
-        if (calendarMonths) calendarMonths.innerHTML = '';
 
         // 2. Clear GRID BACKGROUND ONLY
         const gridBackgroundLayer = document.getElementById('grid-background-layer');
@@ -481,39 +481,9 @@
         }
         calendarDays = tempDays;
 
-        // Render Months (NEW)
-        if (calendarMonths) {
-            let currentMonthLabel = '';
-            let currentMonthSpan = 0;
-            let currentMonthStartIndex = 0;
-
-            calendarDays.forEach((day, index) => {
-                const monthLabel = formatDate(day.date, 'MMM YYYY');
-                
-                if (monthLabel !== currentMonthLabel) {
-                    if (currentMonthLabel) {
-                        // Render previous month block
-                        const monthEl = document.createElement('div');
-                        monthEl.className = 'flex-shrink-0 flex items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-600 font-bold text-sm uppercase tracking-wider';
-                        monthEl.style.width = `${currentMonthSpan * DAY_COLUMN_WIDTH}px`;
-                        monthEl.innerText = currentMonthLabel;
-                        calendarMonths.appendChild(monthEl);
-                    }
-                    currentMonthLabel = monthLabel;
-                    currentMonthSpan = 0;
-                    currentMonthStartIndex = index;
-                }
-                currentMonthSpan++;
-
-                // If last day, render current block
-                if (index === calendarDays.length - 1) {
-                    const monthEl = document.createElement('div');
-                    monthEl.className = 'flex-shrink-0 flex items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-600 font-bold text-sm uppercase tracking-wider';
-                    monthEl.style.width = `${currentMonthSpan * DAY_COLUMN_WIDTH}px`;
-                    monthEl.innerText = currentMonthLabel;
-                    calendarMonths.appendChild(monthEl);
-                }
-            });
+        // Set initial visible month (first day of calendar)
+        if (calendarDays.length > 0) {
+            currentVisibleMonth = formatDate(calendarDays[0].date, 'MMM YYYY');
         }
 
         // Render Dates
@@ -526,16 +496,15 @@
             dateEl.style.height = '100%'; // Full height of the row container (h-12)
 
             dateEl.innerHTML = `
-                <div class="flex items-baseline space-x-1">
-                    <span class="text-xl font-bold ${day.isToday ? 'text-blue-900' : 'text-gray-900'}">
-                        ${day.date.getDate()}
-                    </span>
-                    <span class="font-semibold text-xs uppercase ${day.isToday ? 'text-blue-700' : 'text-gray-500'}">
+                <div class="flex flex-col items-center justify-center leading-tight">
+                    <span class="text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-gray-400'}">
                         ${formatDate(day.date, 'ddd')}
                     </span>
+                    <span class="text-lg font-black ${day.isToday ? 'text-blue-900' : 'text-gray-900'}">
+                        ${day.date.getDate()}
+                    </span>
+                    ${day.isBlocked ? `<div class="text-[8px] uppercase font-bold text-red-500/70 mt-0.5">${day.isHoliday ? 'HOLIDAY' : 'WEEKEND'}</div>` : ''}
                 </div>
-                <!-- Optional: blocked status small text or icon? -->
-                ${day.isBlocked ? `<div class="text-[10px] uppercase font-bold text-red-400 leading-none mt-1">${day.isHoliday ? 'Holiday' : 'Weekend'}</div>` : ''}
             `;
             calendarDates.appendChild(dateEl);
         });
@@ -568,25 +537,40 @@
                          bgClass = 'bg-gray-100'; 
                     }
 
-                    cell.className = `grid-cell absolute border-r border-b border-gray-200 ${bgClass} flex items-end justify-center`;
+                    cell.className = `grid-cell absolute border-r border-b border-gray-200 ${bgClass} flex flex-col`;
                     cell.style.left = `${dayIndex * DAY_COLUMN_WIDTH}px`;
                     cell.style.top = `${lineIndex * ROW_HEIGHT}px`;
                     cell.style.width = `${DAY_COLUMN_WIDTH}px`;
                     cell.style.height = `${ROW_HEIGHT}px`;
-                    cell.style.setProperty('--grid-lines-faint', gridLinesFaint);
-                    cell.style.setProperty('--grid-lines-strong', gridLinesStrong);
+                    cell.className = `grid-cell absolute border-r border-b border-gray-200 ${bgClass} flex flex-col`;
+                    cell.style.left = `${dayIndex * DAY_COLUMN_WIDTH}px`;
+                    cell.style.top = `${lineIndex * ROW_HEIGHT}px`;
+                    cell.style.width = `${DAY_COLUMN_WIDTH}px`;
+                    cell.style.height = `${ROW_HEIGHT}px`;
                     cell.dataset.lineId = line.id;
                     cell.dataset.date = formatDate(day.date, 'YYYY-MM-DD');
                     cell.dataset.isBlocked = day.isBlocked;
                     
-                    // Add Label (CENTERED)
+                    // Task Area (Top 70%) - Grid Lines Restored
+                    const taskArea = document.createElement('div');
+                    taskArea.className = "flex-1 relative pointer-events-none"; // 70% height via flex-1
+                    taskArea.style.height = '70%';
+                    // Explicitly set background image here without 'grid-cell' class to avoid app.css background-size override if problematic
+                    taskArea.style.backgroundImage = gridLinesFaint;
+                    taskArea.style.backgroundSize = 'auto 100%';
+                    cell.appendChild(taskArea);
+
+                    // Hours Area (Bottom 30%)
+                    const hoursArea = document.createElement('div');
+                    hoursArea.className = "h-[30%] border-t border-gray-100 bg-gray-50 flex items-center justify-center pointer-events-none";
+                    
                     if (!day.isBlocked && workHours > 0) {
-                        const label = document.createElement('div');
-                        // Changed: inset-0, flex centered, opacity for subtle look
-                        label.className = "absolute inset-0 w-full flex items-center justify-center text-xs text-blue-800 pointer-events-none select-none opacity-25 font-bold tracking-widest";
-                        label.innerText = `${workHours}H`;
-                        cell.appendChild(label);
+                        const label = document.createElement('span');
+                        label.className = "text-[9px] font-bold text-gray-500 uppercase tracking-tighter opacity-70";
+                        label.innerText = `${workHours} HOURS`;
+                        hoursArea.appendChild(label);
                     }
+                    cell.appendChild(hoursArea);
 
                     gridCellsFrag.appendChild(cell);
                 });
@@ -663,15 +647,16 @@
         </div>
     </div>
 
+    <!-- Fixed Month Indicator -->
+    <div id="fixed-month-indicator" class="flex-shrink-0 h-10 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-center shadow-md z-30 relative">
+        <span class="font-bold text-lg tracking-wide">{currentVisibleMonth || 'Loading...'}</span>
+    </div>
+    
     <!-- Calendar Header (Dates) -->
-    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow z-10 h-24 overflow-hidden">
-        <div class="flex flex-col h-full w-max">
-            <!-- Row 2: Months -->
-            <div id="calendar-months" class="flex h-12 border-b border-gray-200">
-                <!-- JS Injected -->
-            </div>
-            <!-- Row 3: Dates -->
-            <div id="calendar-dates" class="flex h-12">
+    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow z-10 h-14 overflow-hidden">
+        <div class="flex h-full w-max">
+            <!-- Dates Row -->
+            <div id="calendar-dates" class="flex h-14">
                  <!-- JS Injected -->
             </div>
         </div>
@@ -683,11 +668,16 @@
         class="flex-1 overflow-auto custom-scrollbar"
         onscroll={(e) => {
             onScroll(e.target.scrollTop);
-            // Sync header scroll X if needed, but header seems to rely on body scroll? 
-            // Actually usually header needs to sync X with body. 
-            // Let's assume X sync is handled or standard behavior for now, focus on Y for sidebar.
+            // Sync header scroll X
             const header = document.getElementById('calendar-header');
             if(header) header.scrollLeft = e.target.scrollLeft;
+            
+            // Update current visible month based on scroll position
+            const scrollLeft = e.target.scrollLeft;
+            const visibleDayIndex = Math.floor(scrollLeft / DAY_COLUMN_WIDTH);
+            if (calendarDays[visibleDayIndex]) {
+                currentVisibleMonth = formatDate(calendarDays[visibleDayIndex].date, 'MMM YYYY');
+            }
         }}
     >
         <div id="calendar-grid" class="relative min-w-max">

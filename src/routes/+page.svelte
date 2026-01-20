@@ -56,12 +56,16 @@
                     orderId: 'PO-4567',
                     style: 'T-Shirt (Red)',
                     quantity: 5000,
-                    start: '2026-01-04T09:00:00',
-                    end: '2026-01-11T13:30:00',
+                    start: '2025-12-04T09:00:00',
+                    end: '2025-12-11T13:30:00',
                     total_days: 8,
                     total_working_days: 6,
                     completed_days: 3,
-                    completed_quantity: 1500,
+                    completed_quantity: 4000,
+                    completed_segments: [
+                        { qty: 2500, color: 'bg-green-500' },
+                        { qty: 1500, color: 'bg-yellow-400' }
+                    ]
                 },
                 {
                     id: 'task-102',
@@ -71,10 +75,14 @@
                     quantity: 3000,
                     start: '2026-01-15T14:00:00',
                     end: '2026-01-30T17:00:00',
-                    total_days:16,
-                    total_working_days:12,
-                    completed_days:5,
-                    completed_quantity:1500,
+                    total_days: 16,
+                    total_working_days: 12,
+                    completed_days: 5,
+                    completed_quantity: 1500,
+                    completed_segments: [
+                        { qty: 1000, color: 'bg-green-500' },
+                        { qty: 500, color: 'bg-blue-400' }
+                    ]
                 }
             ];
             let unplannedTasks = $state([
@@ -90,6 +98,7 @@
                     total_working_days: 4,
                     completed_days: 0,
                     completed_quantity: 0,
+                    completed_segments: []
                 },
                 {
                     id: 'task-104',
@@ -103,6 +112,7 @@
                     total_working_days: 8,
                     completed_days: 0,
                     completed_quantity: 0,
+                    completed_segments: []
                 },
             ]);
         
