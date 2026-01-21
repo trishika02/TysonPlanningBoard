@@ -10,6 +10,7 @@
             let tasks = $state([]);
             let lines = $state([]);
             let showUnplanned = $state(false); // State for toggling unplanned panel
+            let showUnplanned2 = $state(false); // State for toggling second unplanned panel
             let sidebar; // Sidebar instance binding
             let calendar; // Calendar instance binding
             
@@ -279,13 +280,22 @@
     </div>
 
     <!-- Floating Button at Bottom Center (offset for sidebar) -->
-    <button 
-        class="fixed bottom-12 z-50 flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-700 transition-all font-medium"
-        style="left: calc(50% + 8rem); transform: translateX(-50%);"
-        onclick={() => showUnplanned = !showUnplanned}
-    >
-        Unplanned Orders
-    </button>
+    <!-- Floating Buttons at Bottom Center (offset for sidebar) -->
+    <div class="fixed bottom-12 z-50 flex gap-4" style="left: calc(50% + 8rem); transform: translateX(-50%);">
+        <button 
+            class="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-700 transition-all font-medium"
+            onclick={() => showUnplanned = !showUnplanned}
+        >
+            Unplanned Orders
+        </button>
+
+        <button 
+            class="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all font-medium"
+            onclick={() => showUnplanned2 = !showUnplanned2}
+        >
+            Unplanned Orders
+        </button>
+    </div>
 
     <!-- Floating Panel (above the button, offset for sidebar) -->
     {#if showUnplanned}
@@ -339,6 +349,49 @@
                     {#if unplannedTasks.length === 0}
                         <div class="p-4 text-center text-gray-500">No unplanned tasks</div>
                     {/if}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Floating Panel 2 (above the button, offset for sidebar) -->
+    {#if showUnplanned2}
+        <div class="fixed bottom-28 z-50 mx-4" style="left: calc(50% + 8rem); transform: translateX(-50%);" transition:slide>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-[600px] max-w-[90vw] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[60vh]">
+                <!-- Header -->
+                <div class="bg-indigo-100 dark:bg-indigo-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Unplanned Strip 2</h3>
+                    <button 
+                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        onclick={() => showUnplanned2 = false}
+                    >
+                        ✕
+                    </button>
+                </div>
+                
+                <!-- Table Content -->
+                <div class="overflow-y-auto p-0">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-2 w-10"></th> <!-- Drag Handle Column -->
+                                <th class="px-4 py-2">Order</th>
+                                <th class="px-4 py-2">Style</th>
+                                <th class="px-4 py-2 text-right">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Placeholder Rows -->
+                            {#each Array(5) as _, i}
+                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                    <td class="px-4 py-2 text-center text-gray-400">-</td>
+                                    <td class="px-4 py-2 text-gray-400 italic">Order #{i + 1}</td>
+                                    <td class="px-4 py-2 text-gray-400 italic">Style #{i + 1}</td>
+                                    <td class="px-4 py-2 text-right text-gray-400">0</td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
