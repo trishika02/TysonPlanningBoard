@@ -186,6 +186,27 @@
                  // DISABLED: Keeping user predefined dates
             }
 
+            let draggedUnplannedTask = $state(null);
+
+            function handleUnplannedDragStart(e, task) {
+                draggedUnplannedTask = task;
+                // Set necessary data for drag
+                e.dataTransfer.effectAllowed = 'copy';
+                // We might need some data but mostly relying on state prop
+                e.dataTransfer.setData('application/json', JSON.stringify(task)); 
+            }
+
+            function handleUnplannedDragEnd(e) {
+                draggedUnplannedTask = null;
+            }
+
+            function handleUnplannedDrop(taskId) {
+                // Remove from unplanned list
+                unplannedTasks = unplannedTasks.filter(t => t.id !== taskId);
+                showUnplanned = false; // Optional: close panel? Maybe keep it open if they want to drag more.
+                // Keeping it open might be better UX for multiple moves.
+            }
+
             function addToBoard(task, targetLineId = null) {
                 // Remove from unplanned
                 unplannedTasks = unplannedTasks.filter(t => t.id !== task.id);
@@ -248,7 +269,9 @@
             bind:tasks 
             {lines} 
             {today} 
-            {holidays} 
+            {holidays}
+            {draggedUnplannedTask}
+            onUnplannedDrop={handleUnplannedDrop}
             onScroll={(scrollTop) => {
                 if (sidebar) sidebar.setScrollTop(scrollTop);
             }} 
@@ -284,29 +307,31 @@
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
                             <tr>
+                                <th class="px-4 py-2 w-10"></th> <!-- Drag Handle Column -->
                                 <th class="px-4 py-2">Order</th>
                                 <th class="px-4 py-2">Style</th>
                                 <th class="px-4 py-2 text-right">Qty</th>
-                                <th class="px-4 py-2 text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {#each unplannedTasks as task}
-                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-white">{task.orderId}</td>
-                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300">{task.style}</td>
-                                    <td class="px-4 py-2 text-right font-mono">{task.quantity}</td>
+                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 group">
                                     <td class="px-4 py-2 text-center">
                                         <button 
-                                            class="p-1 rounded-full hover:bg-blue-100 text-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
-                                            title="Add to Board"
-                                            onclick={() => addToBoard(task)}
+                                            class="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 cursor-move"
+                                            title="Drag to Board"
+                                            draggable="true"
+                                            ondragstart={(e) => handleUnplannedDragStart(e, task)}
+                                            ondragend={handleUnplannedDragEnd}
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
                                             </svg>
                                         </button>
                                     </td>
+                                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-white select-none">{task.orderId}</td>
+                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300 select-none">{task.style}</td>
+                                    <td class="px-4 py-2 text-right font-mono select-none">{task.quantity}</td>
                                 </tr>
                             {/each}
                         </tbody>

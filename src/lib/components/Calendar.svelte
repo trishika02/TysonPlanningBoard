@@ -8,6 +8,8 @@
         lines = [],
         today = new Date(),
         holidays = [],
+        draggedUnplannedTask = null,
+        onUnplannedDrop = () => {},
         onScroll = () => {}
     } = $props();
 
@@ -280,16 +282,45 @@
     function handleDragOver(e) {
         e.preventDefault();
         const targetCell = e.target.closest('.grid-cell');
+        
+        // --- UNPLANNED TASK GHOST CREATION ---
+        if (!draggedTaskId && draggedUnplannedTask && !ghostTaskElement) {
+             const estimatedWidth = (draggedUnplannedTask.total_days || 1) * DAY_COLUMN_WIDTH;
+             // Position initial ghost roughly at mouse just to have it
+             const gridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+             const relX = e.clientX - gridRect.left;
+             const relY = e.clientY - gridRect.top;
+             createGhostTask(`${estimatedWidth}px`, `${relY}px`, `${relX}px`);
+        }
+
         if (!targetCell || !ghostTaskElement) return;
 
         const newLineId = targetCell.dataset.lineId;
         const dateStr = targetCell.dataset.date;
         const isBlocked = targetCell.dataset.isBlocked === 'true';
 
-        const data = e.dataTransfer.getData('text/plain');
-        if (!data) return; 
+        let activeTaskId = draggedTaskId;
+        let durationMs = 0;
+        let taskOffsetLeft = 0;
+
+        // Try getting data from dataTransfer or Fallback to state
+        try {
+            const data = e.dataTransfer.getData('text/plain');
+            if (data) {
+                const parsed = JSON.parse(data);
+                durationMs = parsed.durationMs;
+                taskOffsetLeft = parsed.taskOffsetLeft;
+            }
+        } catch (err) {}
+
+        if (!activeTaskId && draggedUnplannedTask) {
+             activeTaskId = draggedUnplannedTask.id;
+             // If we couldn't get duration from dataTransfer (likely), calc it
+             if (!durationMs) {
+                durationMs = (draggedUnplannedTask.total_days || 1) * 24 * 60 * 60 * 1000;
+             }
+        }
         
-        const { id: droppedTaskId, durationMs, taskOffsetLeft } = JSON.parse(data);
         const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
         const workHours = getLineWorkHours(new Date(dateStr), newLineId);
         
@@ -315,7 +346,7 @@
         // Simple End Date Calculation
         const newEndDate = new Date(newStartDate.getTime() + durationMs);
         
-        const hasOverlap = isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate);
+        const hasOverlap = isOverlapping(activeTaskId, newLineId, newStartDate, newEndDate);
         
         const startPixel = getPixelOffsetForDate(newStartDate, newLineId);
         const endPixel = getPixelOffsetForDate(newEndDate, newLineId);
@@ -379,7 +410,26 @@
         const dateStr = targetCell.dataset.date;
         const isBlocked = targetCell.dataset.isBlocked === 'true';
 
-        const { id: droppedTaskId, durationMs, taskOffsetLeft } = JSON.parse(e.dataTransfer.getData('text/plain'));
+        let durationMs = 0;
+        let taskOffsetLeft = 0;
+        let droppedTaskId = null;
+
+        try {
+             // Try standard drag data first
+             const rawData = e.dataTransfer.getData('text/plain');
+             if (rawData) {
+                const data = JSON.parse(rawData);
+                droppedTaskId = data.id;
+                durationMs = data.durationMs;
+                taskOffsetLeft = data.taskOffsetLeft;
+             }
+        } catch (err) {}
+
+        // Fallback or override if it's an unplanned task
+        if (!droppedTaskId && draggedUnplannedTask) {
+             droppedTaskId = draggedUnplannedTask.id;
+             durationMs = (draggedUnplannedTask.total_days || 1) * 24 * 60 * 60 * 1000;
+        }
 
         if (isBlocked) {
             console.warn("Cannot drop on a blocked day!");
@@ -416,14 +466,27 @@
         if (newLineId && droppedTaskId) {
             const taskIndex = tasks.findIndex(t => t.id === droppedTaskId);
             if (taskIndex !== -1) {
-                // Mutate state directly
+                // Mutate existing
                 tasks[taskIndex].lineId = newLineId;
                 tasks[taskIndex].start = newStartDate.toISOString();
                 tasks[taskIndex].end = newEndDate.toISOString();
-                
-                // No need to call renderBoard() for tasks, Svelte handles it!
-                // We might need to handle ghost cleanup if strict
+            } else if (draggedUnplannedTask && droppedTaskId === draggedUnplannedTask.id) {
+                // New Task
+                const newTask = {
+                    ...draggedUnplannedTask,
+                    lineId: newLineId,
+                    start: newStartDate.toISOString(),
+                    end: newEndDate.toISOString()
+                };
+                tasks.push(newTask);
+                onUnplannedDrop(droppedTaskId);
             }
+        }
+
+        // Cleanup
+        if (ghostTaskElement) {
+            ghostTaskElement.remove();
+            ghostTaskElement = null;
         }
     }
 
