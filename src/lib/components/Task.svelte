@@ -119,7 +119,7 @@
 
     <!-- Content: Stats Row (Layered on top) -->
     <div class="relative z-10 font-bold text-[11px] leading-tight flex items-center gap-1.5 whitespace-nowrap drop-shadow-lg select-none px-1.5 w-full pointer-events-none">
-        <span class="text-white uppercase font-extrabold tracking-tight">{task.style}</span>
+        <span class="text-white uppercase font-extrabold tracking-tight">{task.style} {task.completed_quantity || 0}/{task.quantity}</span>
         <span class="text-white/30 font-normal">|</span>
         <span class="text-white">{task.total_days}D</span>
         <span class="text-white/30 font-normal">|</span>
