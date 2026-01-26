@@ -1,6 +1,8 @@
 <script>
     import { onMount, tick } from 'svelte';
     import Task from '$lib/components/Task.svelte';
+    import ContextMenu from '$lib/components/ContextMenu.svelte';
+    import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
 
     // Props
     let { 
@@ -49,6 +51,14 @@
     let originalLineId = null;
     let draggedTaskDuration = 0;
     let ghostTaskElement = null;
+
+    // Context Menu & Split Modal State
+    let showContextMenu = $state(false);
+    let contextMenuX = $state(0);
+    let contextMenuY = $state(0);
+    let selectedTaskForContext = $state(null);
+    let showSplitModal = $state(false);
+    let selectedTaskForSplit = $state(null);
 
     // Helpers
     function getStandardWorkHours(dayOfWeek) {
@@ -395,6 +405,70 @@
         if (targetCell) {
             targetCell.classList.remove('drag-over');
         }
+    }
+
+    // Context Menu Handlers
+    function handleTaskContextMenu(e, task) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        selectedTaskForContext = task;
+        contextMenuX = e.pageX;
+        contextMenuY = e.pageY;
+        showContextMenu = true;
+    }
+
+    function handleContextMenuItemClick(item) {
+        if (item.id === 'split' && selectedTaskForContext) {
+            selectedTaskForSplit = selectedTaskForContext;
+            showSplitModal = true;
+        }
+        showContextMenu = false;
+    }
+
+    function handleContextMenuClose() {
+        showContextMenu = false;
+        selectedTaskForContext = null;
+    }
+
+    function handleSplitTask({ splitQuantity }) {
+        if (!selectedTaskForSplit) return;
+
+        const originalTask = tasks.find(t => t.id === selectedTaskForSplit.id);
+        if (!originalTask) return;
+
+        // Generate new task ID
+        const newTaskId = `${originalTask.id}-split-${Date.now()}`;
+
+        // Calculate proportional dates for the new task (same as original for now)
+        const newTask = {
+            ...originalTask,
+            id: newTaskId,
+            quantity: splitQuantity,
+            completed_quantity: 0,
+            completed_segments: [],
+            // Keep the same start/end dates and position - user can drag it afterward
+        };
+
+        // Reduce original task quantity
+        originalTask.quantity = originalTask.quantity - splitQuantity;
+        
+        // Adjust completed_quantity if it exceeds new quantity
+        if (originalTask.completed_quantity > originalTask.quantity) {
+            originalTask.completed_quantity = originalTask.quantity;
+        }
+
+        // Add new task to tasks array
+        tasks.push(newTask);
+
+        // Close modal and reset state
+        showSplitModal = false;
+        selectedTaskForSplit = null;
+    }
+
+    function handleSplitModalCancel() {
+        showSplitModal = false;
+        selectedTaskForSplit = null;
     }
 
     function handleDrop(e) {
@@ -759,6 +833,7 @@
                             style={getTaskStyle(task)}
                             onDragStart={(e) => handleDragStart(e)}
                             onDragEnd={(e) => handleDragEnd(e)}
+                            onContextMenu={(e, task) => handleTaskContextMenu(e, task)}
                             {formatDate}
                         />
                     {/if}
@@ -766,4 +841,24 @@
             </div>
         </div>
     </div>
+
+    <!-- Context Menu -->
+    <ContextMenu 
+        bind:visible={showContextMenu}
+        x={contextMenuX}
+        y={contextMenuY}
+        menuItems={[
+            { id: 'split', label: 'Split Task', icon: '✂️' }
+        ]}
+        onItemClick={handleContextMenuItemClick}
+        onClose={handleContextMenuClose}
+    />
+
+    <!-- Split Task Modal -->
+    <SplitTaskModal 
+        bind:visible={showSplitModal}
+        task={selectedTaskForSplit}
+        onSubmit={handleSplitTask}
+        onCancel={handleSplitModalCancel}
+    />
 </div>

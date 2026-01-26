@@ -2,7 +2,7 @@
 <script>
     import { tooltipStore } from '$lib/stores/tooltipStore.svelte.js';
 
-    let { task, style, onDragStart, onDragEnd, formatDate } = $props();
+    let { task, style, onDragStart, onDragEnd, onContextMenu, formatDate } = $props();
 
     function handleDragStart(e) {
         tooltipStore.hide();
@@ -61,6 +61,16 @@
         return null;
     });
 
+    
+    function handleContextMenu(e) {
+        e.preventDefault(); // Prevent default browser context menu
+        e.stopPropagation();
+        
+        if (onContextMenu) {
+            onContextMenu(e, task);
+        }
+    }
+
     // 2. Time Progress (Background Gradient)
     function getBackgroundStyle() {
         // Colors
@@ -88,6 +98,7 @@
     draggable="true"
     ondragstart={handleDragStart}
     ondragend={handleDragEnd}
+    oncontextmenu={handleContextMenu}
     onmouseenter={handleRemainingEnter}
     onmousemove={handleMouseMove}
     onmouseleave={handleMouseLeave}
