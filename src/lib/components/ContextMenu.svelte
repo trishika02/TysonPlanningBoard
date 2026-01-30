@@ -14,7 +14,15 @@
     let adjustedX = $state(x);
     let adjustedY = $state(y);
 
-    // Adjust position to keep menu on screen
+    // When opening or when x/y change, position menu at cursor/task immediately
+    $effect(() => {
+        if (visible) {
+            adjustedX = x;
+            adjustedY = y;
+        }
+    });
+
+    // After render, adjust position to keep menu on screen
     $effect(() => {
         if (visible && menuElement) {
             tick().then(() => {
@@ -23,17 +31,17 @@
                 const windowHeight = window.innerHeight;
 
                 // Adjust horizontal position
-                if (x + menuRect.width > windowWidth) {
+                if (adjustedX + menuRect.width > windowWidth) {
                     adjustedX = windowWidth - menuRect.width - 10;
-                } else {
-                    adjustedX = x;
+                } else if (adjustedX < 10) {
+                    adjustedX = 10;
                 }
 
                 // Adjust vertical position
-                if (y + menuRect.height > windowHeight) {
+                if (adjustedY + menuRect.height > windowHeight) {
                     adjustedY = windowHeight - menuRect.height - 10;
-                } else {
-                    adjustedY = y;
+                } else if (adjustedY < 10) {
+                    adjustedY = 10;
                 }
             });
         }

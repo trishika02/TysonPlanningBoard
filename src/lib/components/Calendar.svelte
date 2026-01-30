@@ -407,14 +407,14 @@
         }
     }
 
-    // Context Menu Handlers
+    // Context Menu Handlers (use clientX/clientY so menu appears at cursor/task with position:fixed)
     function handleTaskContextMenu(e, task) {
         e.preventDefault();
         e.stopPropagation();
         
         selectedTaskForContext = task;
-        contextMenuX = e.pageX;
-        contextMenuY = e.pageY;
+        contextMenuX = e.clientX;
+        contextMenuY = e.clientY;
         showContextMenu = true;
     }
 
