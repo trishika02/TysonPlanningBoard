@@ -4,7 +4,7 @@
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { onMount } from 'svelte';
-    import { slide } from 'svelte/transition';
+            import { slide } from 'svelte/transition';
         
             // === 1. TOP LEVEL STATE ===
             let tasks = $state([]);
@@ -293,7 +293,7 @@
             class="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all font-medium"
             onclick={() => showUnplanned2 = !showUnplanned2}
         >
-            Unplanned Orders
+            Available Slots
         </button>
     </div>
 
