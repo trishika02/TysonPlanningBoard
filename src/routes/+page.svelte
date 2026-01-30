@@ -11,6 +11,12 @@
             let lines = $state([]);
             let showUnplanned = $state(false); // State for toggling unplanned panel
             let showUnplanned2 = $state(false); // State for toggling second unplanned panel
+            /** Dragged position for Unplanned panel (null = use default centered position) */
+            let unplannedPanelPos = $state(null);
+            /** Dragged position for Unplanned Strip 2 panel */
+            let unplannedPanel2Pos = $state(null);
+            /** When dragging the panel by its header: { panel, startX, startY, startLeft, startTop } */
+            let panelDragState = $state(null);
             let sidebar; // Sidebar instance binding
             let calendar; // Calendar instance binding
             
@@ -226,6 +232,37 @@
                 }
             }
 
+            function startPanelDrag(e, panelName) {
+                if (e.target.closest('button')) return; // don't drag when clicking close
+                const wrapper = e.currentTarget.parentElement?.parentElement;
+                if (!wrapper) return;
+                const rect = wrapper.getBoundingClientRect();
+                panelDragState = {
+                    panel: panelName,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    startLeft: rect.left,
+                    startTop: rect.top
+                };
+            }
+
+            function onPanelMouseMove(e) {
+                if (!panelDragState) return;
+                const dx = e.clientX - panelDragState.startX;
+                const dy = e.clientY - panelDragState.startY;
+                const left = panelDragState.startLeft + dx;
+                const top = panelDragState.startTop + dy;
+                if (panelDragState.panel === 'unplanned') {
+                    unplannedPanelPos = { left, top };
+                } else {
+                    unplannedPanel2Pos = { left, top };
+                }
+            }
+
+            function onPanelMouseUp() {
+                panelDragState = null;
+            }
+
             function handleUnplannedDrop(taskId) {
                 // Remove from unplanned list
                 unplannedTasks = unplannedTasks.filter(t => t.id !== taskId);
@@ -322,16 +359,30 @@
         </button>
     </div>
 
+    <svelte:window onmousemove={onPanelMouseMove} onmouseup={onPanelMouseUp} />
+
     <!-- Floating Panel (above the button, offset for sidebar) -->
     {#if showUnplanned}
-        <div class="fixed bottom-28 z-50 mx-4" style="left: calc(50% + 8rem); transform: translateX(-50%);" transition:slide>
+        <div
+            class="fixed z-50 mx-4"
+            style={unplannedPanelPos
+                ? `left: ${unplannedPanelPos.left}px; top: ${unplannedPanelPos.top}px; bottom: auto; transform: none;`
+                : 'left: calc(50% + 8rem); bottom: 7rem; transform: translateX(-50%);'}
+            transition:slide
+        >
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-[600px] max-w-[90vw] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[60vh]">
-                <!-- Header -->
-                <div class="bg-gray-100 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <!-- Header (drag here to move panel) -->
+                <div
+                    class="bg-gray-100 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-move select-none"
+                    role="button"
+                    tabindex="0"
+                    onmousedown={(e) => startPanelDrag(e, 'unplanned')}
+                    onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
+                >
                     <h3 class="font-bold text-gray-800 dark:text-gray-100">Unplanned strip</h3>
                     <button 
-                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        onclick={() => showUnplanned = false}
+                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
+                        onclick={() => { showUnplanned = false; unplannedPanelPos = null; }}
                     >
                         ✕
                     </button>
@@ -381,14 +432,26 @@
 
     <!-- Floating Panel 2 (above the button, offset for sidebar) -->
     {#if showUnplanned2}
-        <div class="fixed bottom-28 z-50 mx-4" style="left: calc(50% + 8rem); transform: translateX(-50%);" transition:slide>
+        <div
+            class="fixed z-50 mx-4"
+            style={unplannedPanel2Pos
+                ? `left: ${unplannedPanel2Pos.left}px; top: ${unplannedPanel2Pos.top}px; bottom: auto; transform: none;`
+                : 'left: calc(50% + 8rem); bottom: 7rem; transform: translateX(-50%);'}
+            transition:slide
+        >
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-[600px] max-w-[90vw] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[60vh]">
-                <!-- Header -->
-                <div class="bg-indigo-100 dark:bg-indigo-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <!-- Header (drag here to move panel) -->
+                <div
+                    class="bg-indigo-100 dark:bg-indigo-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-move select-none"
+                    role="button"
+                    tabindex="0"
+                    onmousedown={(e) => startPanelDrag(e, 'unplanned2')}
+                    onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
+                >
                     <h3 class="font-bold text-gray-800 dark:text-gray-100">Unplanned Strip 2</h3>
                     <button 
-                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        onclick={() => showUnplanned2 = false}
+                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
+                        onclick={() => { showUnplanned2 = false; unplannedPanel2Pos = null; }}
                     >
                         ✕
                     </button>
