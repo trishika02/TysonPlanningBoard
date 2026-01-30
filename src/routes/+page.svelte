@@ -191,14 +191,39 @@
 
             function handleUnplannedDragStart(e, task) {
                 draggedUnplannedTask = task;
-                // Set necessary data for drag
                 e.dataTransfer.effectAllowed = 'copy';
-                // We might need some data but mostly relying on state prop
-                e.dataTransfer.setData('application/json', JSON.stringify(task)); 
+                e.dataTransfer.setData('application/json', JSON.stringify(task));
+
+                // Custom drag image: show order, style, and quantity (not just the icon)
+                const isDark = document.documentElement.classList.contains('dark');
+                const dragImage = document.createElement('div');
+                dragImage.setAttribute('role', 'presentation');
+                dragImage.style.cssText = `position:absolute; left:-9999px; top:0; padding:10px 16px; background:${isDark ? '#1f2937' : '#fff'}; color:${isDark ? '#f3f4f6' : '#111'}; border:1px solid ${isDark ? '#374151' : '#e5e7eb'}; border-radius:8px; box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.2); font-size:13px; white-space:nowrap; display:flex; align-items:center; gap:24px; z-index:9999; font-family:inherit;`;
+                const styleColor = isDark ? '#9ca3af' : '#6b7280';
+                dragImage.innerHTML = `
+                    <span style="font-weight:600;">${escapeHtml(task.orderId)}</span>
+                    <span style="color:${styleColor};">${escapeHtml(task.style)}</span>
+                    <span style="font-variant-numeric:tabular-nums;">${escapeHtml(String(task.quantity))}</span>
+                `;
+                document.body.appendChild(dragImage);
+                const w = dragImage.offsetWidth;
+                const h = dragImage.offsetHeight;
+                e.dataTransfer.setDragImage(dragImage, Math.floor(w / 2), Math.floor(h / 2));
+                e.target._unplannedDragImage = dragImage;
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
 
             function handleUnplannedDragEnd(e) {
                 draggedUnplannedTask = null;
+                if (e.target._unplannedDragImage?.parentNode) {
+                    e.target._unplannedDragImage.parentNode.removeChild(e.target._unplannedDragImage);
+                    e.target._unplannedDragImage = null;
+                }
             }
 
             function handleUnplannedDrop(taskId) {
