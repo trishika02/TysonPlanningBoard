@@ -3,6 +3,7 @@
     import Task from '$lib/components/Task.svelte';
     import ContextMenu from '$lib/components/ContextMenu.svelte';
     import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
+	import { work_hour_data } from '$lib/stores/data';
 
     // Props
     let { 
@@ -69,8 +70,10 @@
             default: return 10; // Weekday (Mon-Thurs)
         }
     }
+// On this nav bar thare is a search field. I want to search by order id and style id and if the search is found, then it should show as drop down button of the search input filed and if I click on the search result, then
+    
 
-    function getLineWorkHours(date, lineId) {
+function getLineWorkHours(date, lineId) {
         // 1. Check if it's a blocked day (weekend/holiday)
         // We can check calendarDays but easier to check raw date if we have helpers
         // relying on calendarDays for now for consistency
@@ -79,13 +82,35 @@
         
         if (day && day.isBlocked) return 0;
 
-        // 2. Variable logic
-        if (lineId === 'line-1') return 8;
-        if (lineId === 'line-2') return 12;
+
+
+        // find on work_hour_data list by date and lineid
+        let lineId_ = lineId.replace('-', ' ');
+        lineId_ = lineId_.replace('line', 'Line');
+
+   
+       
+        let date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
+       
         
-        // Default fallthrough
-        const dayOfWeek = date.getDay();
-        return getStandardWorkHours(dayOfWeek);
+        const workHourData = work_hour_data.find(d => d.Date === date_ && d.Line === lineId_);
+        console.log({workHourData,date_,lineId_});
+        
+        if (workHourData) {
+            return workHourData?.WorkHour || 0
+
+        }
+        else {
+            return 0
+        }
+
+        // // 2. Variable logic
+        // if (lineId === 'line-1') return 8;
+        // if (lineId === 'line-2') return 12;
+        
+        // // Default fallthrough
+        // const dayOfWeek = date.getDay();
+        // return getStandardWorkHours(dayOfWeek);
     }
 
     function formatDate(date, format) {
