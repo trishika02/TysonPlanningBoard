@@ -85,16 +85,16 @@ function getLineWorkHours(date, lineId) {
 
 
         // find on work_hour_data list by date and lineid
-        let lineId_ = lineId.replace('-', ' ');
-        lineId_ = lineId_.replace('line', 'Line');
+        // let lineId_ = lineId.replace('-', ' ');
+        // lineId_ = lineId_.replace('line', 'Line');
 
    
        
         let date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
        
         
-        const workHourData = work_hour_data.find(d => d.Date === date_ && d.Line === lineId_);
-        console.log({workHourData,date_,lineId_});
+        const workHourData = work_hour_data.find(d => d.Date === date_ && d.Line === lineId);
+        console.log({workHourData,date_,lineId});
         
         if (workHourData) {
             return workHourData?.WorkHour || 0

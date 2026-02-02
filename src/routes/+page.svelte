@@ -3,6 +3,7 @@
             import Calendar from '$lib/components/Calendar.svelte';
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
+	import { floor_line_data } from '$lib/stores/data';
             import { onMount } from 'svelte';
             import { slide } from 'svelte/transition';
         
@@ -21,40 +22,75 @@
             let calendar; // Calendar instance binding
             
             // === 2. MOCK DATA & CONSTANTS ===
-            const MOCK_FLOORS_LINES = [
-                {
-                    "id":"floor_1",
-                    "name":"Floor 1",
-                    "lines": [
-                            { id: 'line-1', name: 'Line 01' },
-                            { id: 'line-2', name: 'Line 02' },
-                            { id: 'line-3', name: 'Line 03' },
-                            { id: 'line-4', name: 'Line 04 (Sewing)' },
-                            { id: 'line-5', name: 'Line 05' },
-                            { id: 'line-6', name: 'Line 06 (Sewing)' },
-                            { id: 'line-7', name: 'Line 07 (Finishing)' },
-                            { id: 'line-8', name: 'Line 08' },
-                            { id: 'line-9', name: 'Line 09' },
-                            { id: 'line-10', name: 'Line 10' },
-                        ]
-                },
-                {
-                    "id":"floor_2",
-                    "name":"Floor 2",
-                    "lines": [
-                        { id: 'line-11', name: 'Line 11' },
-                        { id: 'line-12', name: 'Line 12' },
-                        { id: 'line-13', name: 'Line 13' },
-                        { id: 'line-14', name: 'Line 14' },
-                        { id: 'line-15', name: 'Line 15' },
-                        { id: 'line-16', name: 'Line 16' },
-                        { id: 'line-17', name: 'Line 17' },
-                        { id: 'line-18', name: 'Line 18' },
-                        { id: 'line-19', name: 'Line 19' },
-                        { id: 'line-20', name: 'Line 20' },
-                    ]
-                }
-            ];
+
+//             export const floor_line_data = [
+// 	{
+// 		Id: 'Floor 1',
+// 		Name: 'Floor 1',
+// 		TotalManpower: 24,
+// 		Lines: [
+// 			{ Id: 'Line 1', Name: 'Line 1', Operator: 10, Helper: 13, Ironman: 1, TotalManpower: 24 }
+// 		]
+// 	},
+// 	{
+// 		Id: 'Floor 2',
+// 		Name: 'Floor 2',
+// 		TotalManpower: 25,
+// 		Lines: [{ Id: 'Line2', Name: 'Line2', Operator: 12, Helper: 11, Ironman: 2, TotalManpower: 25 }]
+// 	}
+// ];
+
+            const get_floor_line_data = () => {
+                // mkake all keys to lowercase
+                return floor_line_data.map((item) => {
+                    return {
+                        id: item.Id,
+                        name: item.Name,
+                        lines: item.Lines.map((line) => {
+                            return {
+                                id: line.Id,
+                                name: line.Name
+                            }
+                        })
+                    }
+                })
+            }
+
+            const MOCK_FLOORS_LINES = get_floor_line_data();
+            // [
+            //     {
+            //         "id":"floor_1",
+            //         "name":"Floor 1",
+            //         "lines": [
+            //                 { id: 'line-1', name: 'Line 01' },
+            //                 { id: 'line-2', name: 'Line 02' },
+            //                 { id: 'line-3', name: 'Line 03' },
+            //                 { id: 'line-4', name: 'Line 04 (Sewing)' },
+            //                 { id: 'line-5', name: 'Line 05' },
+            //                 { id: 'line-6', name: 'Line 06 (Sewing)' },
+            //                 { id: 'line-7', name: 'Line 07 (Finishing)' },
+            //                 { id: 'line-8', name: 'Line 08' },
+            //                 { id: 'line-9', name: 'Line 09' },
+            //                 { id: 'line-10', name: 'Line 10' },
+            //             ]
+            //     },
+            //     {
+            //         "id":"floor_2",
+            //         "name":"Floor 2",
+            //         "lines": [
+            //             { id: 'line-11', name: 'Line 11' },
+            //             { id: 'line-12', name: 'Line 12' },
+            //             { id: 'line-13', name: 'Line 13' },
+            //             { id: 'line-14', name: 'Line 14' },
+            //             { id: 'line-15', name: 'Line 15' },
+            //             { id: 'line-16', name: 'Line 16' },
+            //             { id: 'line-17', name: 'Line 17' },
+            //             { id: 'line-18', name: 'Line 18' },
+            //             { id: 'line-19', name: 'Line 19' },
+            //             { id: 'line-20', name: 'Line 20' },
+            //         ]
+            //     }
+            // ];
         
             const MOCK_TASKS = [
                 {
