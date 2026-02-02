@@ -770,6 +770,26 @@
                 </svg>
             </button>
         </div>
+        
+        <!-- Center: Date Range Display -->
+        {#if calendarDays.length > 0}
+            {@const startDate = calendarDays[0].date}
+            {@const endDate = calendarDays[calendarDays.length - 1].date}
+            {@const startDay = startDate.getDate()}
+            {@const startMonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][startDate.getMonth()]}
+            {@const startYear = startDate.getFullYear()}
+            {@const endDay = endDate.getDate()}
+            {@const endMonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][endDate.getMonth()]}
+            {@const endYear = endDate.getFullYear()}
+            <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-blue-50 px-4 py-1.5 rounded-full border border-indigo-200">
+                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="text-xs font-semibold text-gray-700">
+                    {startDay} {startMonth} {startYear} <span class="text-gray-400 mx-1">to</span> {endDay} {endMonth} {endYear}
+                </span>
+            </div>
+        {/if}
 
         <!-- Right: Search Bar -->
         <div class="relative group">
