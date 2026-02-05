@@ -4,6 +4,7 @@
     import ContextMenu from '$lib/components/ContextMenu.svelte';
     import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
 	import { work_hour_data } from '$lib/stores/data';
+	import { getWorkHourData } from '$lib/api-call';
 
     // Props
     let { 
@@ -18,6 +19,7 @@
 
     // Internal State
     let calendarDays = $state([]);
+    let workHourDataList = []; // Plain array, no reactivity needed
     let currentVisibleMonth = $state(''); // Track current visible month based on scroll
     
     // Constants - Default: 30 days before and 30 days after today (60 days total)
@@ -75,42 +77,29 @@
 
 function getLineWorkHours(date, lineId) {
         // 1. Check if it's a blocked day (weekend/holiday)
-        // We can check calendarDays but easier to check raw date if we have helpers
-        // relying on calendarDays for now for consistency
         const dateStr = formatDate(date, 'YYYY-MM-DD');
         const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
         
         if (day && day.isBlocked) return 0;
 
-
-
-        // find on work_hour_data list by date and lineid
-        // let lineId_ = lineId.replace('-', ' ');
-        // lineId_ = lineId_.replace('line', 'Line');
-
-   
-       
-        let date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
-       
+        // Use fetched work hour data (already deeply cloned to strip proxies)
+        const dataSource = workHourDataList.length > 0 ? workHourDataList : [];
+        console.log('dataSource length:', dataSource.length, 'sample:', dataSource[0]);
         
-        const workHourData = work_hour_data.find(d => d.Date === date_ && d.Line === lineId);
-        console.log({workHourData,date_,lineId});
+        const filtr_for_line = dataSource.filter(d => d.Line === lineId);
+        
+        // Convert date format from YYYY-MM-DD to DD-MM-YYYY for API data
+        let date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
+        
+        const workHourData = filtr_for_line.find(d => d.Date === date_)
+        console.log({workHourData, date_,filtr_for_line, lineId, });
         
         if (workHourData) {
-            return workHourData?.WorkHour || 0
-
+            return workHourData?.WorkHour || 0;
         }
         else {
-            return 0
+            return 0;
         }
-
-        // // 2. Variable logic
-        // if (lineId === 'line-1') return 8;
-        // if (lineId === 'line-2') return 12;
-        
-        // // Default fallthrough
-        // const dayOfWeek = date.getDay();
-        // return getStandardWorkHours(dayOfWeek);
     }
 
     function formatDate(date, format) {
@@ -764,7 +753,17 @@ function getLineWorkHours(date, lineId) {
         }
     });
 
-    onMount(() => {
+    onMount(async () => {
+        // Fetch work hour data from API
+        const apiWorkHourData = await getWorkHourData();
+     
+        
+        if (apiWorkHourData && apiWorkHourData.length > 0) {
+            // Deep clone to strip all Svelte 5 reactive proxies from objects
+            workHourDataList = JSON.parse(JSON.stringify(apiWorkHourData));
+            console.log('Work hour data loaded:', workHourDataList.length, 'records');
+        }
+        
         renderBoard();
     });
 

@@ -645,13 +645,29 @@ export const floor_line_data = [
 		Name: 'Floor 1',
 		TotalManpower: 24,
 		Lines: [
-			{ Id: 'Line 1', Name: 'Line 1', Operator: 10, Helper: 13, Ironman: 1, TotalManpower: 24 }
+			{
+				Id: 'Line 1',
+				Name: 'Line 1',
+				Operator: 10,
+				Helper: 13,
+				Ironman: 1,
+				TotalManpower: 24
+			}
 		]
 	},
 	{
 		Id: 'Floor 2',
 		Name: 'Floor 2',
 		TotalManpower: 25,
-		Lines: [{ Id: 'Line2', Name: 'Line2', Operator: 12, Helper: 11, Ironman: 2, TotalManpower: 25 }]
+		Lines: [
+			{
+				Id: 'Line2',
+				Name: 'Line2',
+				Operator: 12,
+				Helper: 11,
+				Ironman: 2,
+				TotalManpower: 25
+			}
+		]
 	}
 ];

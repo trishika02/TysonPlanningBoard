@@ -3,10 +3,12 @@
             import Calendar from '$lib/components/Calendar.svelte';
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
-	import { floor_line_data } from '$lib/stores/data';
+            import { floor_line_data } from '$lib/stores/data';
+            import { getFloorLineData } from '$lib/api-call';
             import { onMount } from 'svelte';
             import { slide } from 'svelte/transition';
-        
+            
+         
             // === 1. TOP LEVEL STATE ===
             let tasks = $state([]);
             let lines = $state([]);
@@ -40,9 +42,16 @@
 // 	}
 // ];
 
-            const get_floor_line_data = () => {
-                // mkake all keys to lowercase
-                return floor_line_data.map((item) => {
+            const get_floor_line_data = async () => {
+                // get floor line data from API
+                const apiData = await getFloorLineData();
+    
+                
+                // If API fails, fallback to store data
+                const data = apiData && apiData.length > 0 ? apiData : floor_line_data;
+                
+                // make all keys to lowercase
+                return data.map((item) => {
                     return {
                         id: item.Id,
                         name: item.Name,
@@ -56,7 +65,7 @@
                 })
             }
 
-            const MOCK_FLOORS_LINES = get_floor_line_data();
+            let MOCK_FLOORS_LINES = $state([]);
             // [
             //     {
             //         "id":"floor_1",
@@ -325,7 +334,10 @@
                 tasks.push(task);
             }
                 
-            onMount(() => {
+            onMount(async () => {
+                // Fetch floor and line data from API
+                MOCK_FLOORS_LINES = await get_floor_line_data();
+                
                 // Init state: Flatten Floors into a single list of rows for Calendar
                 let flatRows = [];
                 for (const floor of MOCK_FLOORS_LINES) {

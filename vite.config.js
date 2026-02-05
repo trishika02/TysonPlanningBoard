@@ -3,6 +3,15 @@ import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
+	server: {
+		proxy: {
+			'/api': {
+				target: 'https://manami-stage.altersense.net',
+				changeOrigin: true,
+				secure: false
+			}
+		}
+	},
 	plugins: [tailwindcss(), sveltekit()],
 	test: {
 		expect: { requireAssertions: true },
