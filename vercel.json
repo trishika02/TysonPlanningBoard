@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/:match*",
+            "destination": "https://manami-stage.altersense.net/api/:match*"
+        }
+    ]
+}
