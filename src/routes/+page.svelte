@@ -4,7 +4,8 @@
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { floor_line_data } from '$lib/stores/data';
-            import { getFloorLineData } from '$lib/api-call';
+            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData } from '$lib/api-call';
+            import { calculateStripTimeline, calculateSingleStripTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
             import { onMount } from 'svelte';
             import { slide } from 'svelte/transition';
             
@@ -12,6 +13,7 @@
             // === 1. TOP LEVEL STATE ===
             let tasks = $state([]);
             let lines = $state([]);
+            let workHoursData = $state([]); // Store work hours for recalculation
             let showUnplanned = $state(false); // State for toggling unplanned panel
             let showUnplanned2 = $state(false); // State for toggling second unplanned panel
             /** Dragged position for Unplanned panel (null = use default centered position) */
@@ -166,6 +168,34 @@
                     completed_quantity: 0,
                     completed_segments: []
                 },
+                {
+                    id: 'task-105',
+                    lineId: '',
+                    orderId: 'PO-4571',
+                    style: 'Hoodie (Black)',
+                    quantity: 1500,
+                    start: '2026-02-01T09:00:00',
+                    end: '2026-02-10T17:00:00',
+                    total_days: 10,
+                    total_working_days: 8,
+                    completed_days: 0,
+                    completed_quantity: 0,
+                    completed_segments: []
+                },
+                {
+                    id: 'task-106',
+                    lineId: '',
+                    orderId: 'PO-4572',
+                    style: 'Tank Top (White)',
+                    quantity: 5000,
+                    start: '2026-02-05T09:00:00',
+                    end: '2026-02-15T17:00:00',
+                    total_days: 10,
+                    total_working_days: 8,
+                    completed_days: 0,
+                    completed_quantity: 0,
+                    completed_segments: []
+                }
             ]);
         
             const MOCK_HOLIDAYS = [
@@ -175,8 +205,8 @@
             ];
         
             let holidays = [...MOCK_HOLIDAYS];
-            // Start view from Jan 1, 2026 to see the tasks
-            let today = $state(new Date('2026-01-01T00:00:00'));
+            // Use actual current date
+            let today = $state(new Date());
         
     const ROW_HEIGHT = 36;
 
@@ -353,7 +383,34 @@
                 }
 
                 lines = flatRows;
-                tasks = [...MOCK_TASKS];
+                
+                // Fetch strips data and work hours from API
+                const [stripsData, fetchedWorkHours] = await Promise.all([
+                    getStripsWithLearningCurve(),
+                    getWorkHourData()
+                ]);
+                
+                // Store work hours for later recalculation
+                workHoursData = fetchedWorkHours || [];
+                
+                if (stripsData && stripsData.length > 0) {
+                    // Calculate timelines using production system logic
+                    const stripsWithTimelines = calculateStripTimeline(
+                        stripsData,
+                        workHoursData,
+                        today
+                    );
+                    
+                    // Transform to application task format
+                    const { planned, unplanned } = transformStripsToTasks(stripsWithTimelines);
+                    
+                    tasks = planned;
+                    unplannedTasks = unplanned;
+                } else {
+                    // Fallback to mock data if API fails
+                    tasks = [...MOCK_TASKS];
+                    // Keep existing unplannedTasks
+                }
         
                 // Initial setup
                 /*setTimeout(() => {
@@ -382,6 +439,24 @@
             {today} 
             {holidays}
             {draggedUnplannedTask}
+            {workHoursData}
+            recalculateTask={(task, newStartDate, newLineId) => {
+                // Recalculate timeline for dropped task
+                const stripData = {
+                    lineId: newLineId,
+                    quantity: task.quantity,
+                    smv: task.smv,
+                    totalManpower: task.manpower,
+                    learningCurveTable: task.learningCurve
+                };
+                const recalculated = calculateSingleStripTimeline(stripData, workHoursData, newStartDate);
+                return {
+                    start: recalculated.startDate,
+                    end: recalculated.endDate,
+                    timeline: recalculated.timeline,
+                    total_days: recalculated.timeline?.length || 0
+                };
+            }}
             onUnplannedDrop={handleUnplannedDrop}
             onScroll={(scrollTop) => {
                 if (sidebar) sidebar.setScrollTop(scrollTop);
@@ -396,14 +471,14 @@
             class="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-700 transition-all font-medium"
             onclick={() => showUnplanned = !showUnplanned}
         >
-            Unplanned Orders
+            Available Strip
         </button>
 
         <button 
             class="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all font-medium"
             onclick={() => showUnplanned2 = !showUnplanned2}
         >
-            Available Slots
+            Unplanned Orders
         </button>
     </div>
 
@@ -427,7 +502,7 @@
                     onmousedown={(e) => startPanelDrag(e, 'unplanned')}
                     onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
                 >
-                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Unplanned strip</h3>
+                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Available Strip</h3>
                     <button 
                         class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
                         onclick={() => { showUnplanned = false; unplannedPanelPos = null; }}
@@ -442,6 +517,7 @@
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
                             <tr>
                                 <th class="px-4 py-2 w-10"></th> <!-- Drag Handle Column -->
+                                <th class="px-4 py-2">Strip ID</th>
                                 <th class="px-4 py-2">Order</th>
                                 <th class="px-4 py-2">Style</th>
                                 <th class="px-4 py-2 text-right">Qty</th>
@@ -463,6 +539,7 @@
                                             </svg>
                                         </button>
                                     </td>
+                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-400 select-none text-xs">{task.id}</td>
                                     <td class="px-4 py-2 font-medium text-gray-900 dark:text-white select-none">{task.orderId}</td>
                                     <td class="px-4 py-2 text-gray-600 dark:text-gray-300 select-none">{task.style}</td>
                                     <td class="px-4 py-2 text-right font-mono select-none">{task.quantity}</td>
@@ -496,7 +573,7 @@
                     onmousedown={(e) => startPanelDrag(e, 'unplanned2')}
                     onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
                 >
-                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Unplanned Strip 2</h3>
+                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Unplanned Orders</h3>
                     <button 
                         class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
                         onclick={() => { showUnplanned2 = false; unplannedPanel2Pos = null; }}

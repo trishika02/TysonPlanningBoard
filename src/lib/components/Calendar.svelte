@@ -13,6 +13,8 @@
         today = new Date(),
         holidays = [],
         draggedUnplannedTask = null,
+        workHoursData = [],
+        recalculateTask = null,
         onUnplannedDrop = () => {},
         onScroll = () => {}
     } = $props();
@@ -22,9 +24,9 @@
     let workHourDataList = []; // Plain array, no reactivity needed
     let currentVisibleMonth = $state(''); // Track current visible month based on scroll
     
-    // Constants - Default: 30 days before and 30 days after today (60 days total)
-    let daysBefore = $state(30);  // Days before today
-    let daysAfter = $state(30);   // Days after today
+    // Constants - Calendar starts on today and shows 60 days forward
+    let daysBefore = $state(0);  // Start on today (no days before)
+    let daysAfter = $state(60);   // Show 60 days after today
     const DAY_COLUMN_WIDTH = 140; // Wider columns for better visibility
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
@@ -75,7 +77,7 @@
 // On this nav bar thare is a search field. I want to search by order id and style id and if the search is found, then it should show as drop down button of the search input filed and if I click on the search result, then
     
 
-function getLineWorkHours(date, lineId) {
+    function getLineWorkHours(date, lineId) {
         // 1. Check if it's a blocked day (weekend/holiday)
         const dateStr = formatDate(date, 'YYYY-MM-DD');
         const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
@@ -84,7 +86,6 @@ function getLineWorkHours(date, lineId) {
 
         // Use fetched work hour data (already deeply cloned to strip proxies)
         const dataSource = workHourDataList.length > 0 ? workHourDataList : [];
-        console.log('dataSource length:', dataSource.length, 'sample:', dataSource[0]);
         
         const filtr_for_line = dataSource.filter(d => d.Line === lineId);
         
@@ -92,13 +93,12 @@ function getLineWorkHours(date, lineId) {
         let date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
         
         const workHourData = filtr_for_line.find(d => d.Date === date_)
-        console.log({workHourData, date_,filtr_for_line, lineId, });
         
         if (workHourData) {
             return workHourData?.WorkHour || 0;
         }
         else {
-            return 0;
+            return getStandardWorkHours(date.getDay());
         }
     }
 
@@ -363,8 +363,9 @@ function getLineWorkHours(date, lineId) {
         const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
         let newStartOffsetMinutes = Math.floor(percentOffset * totalWorkMinutes);
         
-        const newStartDate = new Date(`${dateStr}T00:00:00`);
-        newStartDate.setHours(START_HOUR);
+        // Parse dateStr (YYYY-MM-DD format) and construct date in local time
+        const [dragYear, dragMonth, dragDay] = dateStr.split('-').map(Number);
+        const newStartDate = new Date(dragYear, dragMonth - 1, dragDay, START_HOUR, 0, 0, 0);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
         // Simple End Date Calculation
@@ -539,12 +540,45 @@ function getLineWorkHours(date, lineId) {
         const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
         let newStartOffsetMinutes = Math.floor(percentOffset * totalWorkMinutes);
 
-        const newStartDate = new Date(`${dateStr}T00:00:00`);
-        newStartDate.setHours(START_HOUR);
+        // Parse dateStr (YYYY-MM-DD format) and construct date in local time
+        const [dropYear, dropMonth, dropDay] = dateStr.split('-').map(Number);
+        const newStartDate = new Date(dropYear, dropMonth - 1, dropDay, START_HOUR, 0, 0, 0);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
-        // Simple End Date Calculation
-        const newEndDate = new Date(newStartDate.getTime() + durationMs);
+        console.log('=== DROP DATE DEBUG ===');
+        console.log('dateStr from cell:', dateStr);
+        console.log('Parsed: year:', dropYear, 'month:', dropMonth, 'day:', dropDay);
+        console.log('newStartDate constructed:', newStartDate.toISOString());
+        console.log('newStartDate local:', newStartDate.toString());
+        console.log('======================');
+
+        // Recalculate timeline using production system logic if function is available
+        let newEndDate;
+        let recalculatedData = null;
+        
+        if (recalculateTask && droppedTaskId) {
+            const task = tasks.find(t => t.id === droppedTaskId) || draggedUnplannedTask;
+            if (task) {
+                recalculatedData = recalculateTask(task, newStartDate, newLineId);
+                newEndDate = new Date(recalculatedData.end);
+                
+                // Console log the strip's timeline
+                console.log('=== STRIP TIMELINE ON DROP ===');
+                console.log('Strip ID:', task.id);
+                console.log('Line ID:', newLineId);
+                console.log('Start Date:', recalculatedData.start);
+                console.log('End Date:', recalculatedData.end);
+                console.log('Total Days:', recalculatedData.total_days);
+                console.log('Timeline:', recalculatedData.timeline);
+                console.log('==============================');
+            } else {
+                // Fallback to simple calculation
+                newEndDate = new Date(newStartDate.getTime() + durationMs);
+            }
+        } else {
+            // Fallback to simple calculation
+            newEndDate = new Date(newStartDate.getTime() + durationMs);
+        }
 
         if (isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate)) {
             console.warn("DROP REJECTED: Task would overlap with another task.");
@@ -554,18 +588,34 @@ function getLineWorkHours(date, lineId) {
         if (newLineId && droppedTaskId) {
             const taskIndex = tasks.findIndex(t => t.id === droppedTaskId);
             if (taskIndex !== -1) {
-                // Mutate existing
+                // Mutate existing task with recalculated data
                 tasks[taskIndex].lineId = newLineId;
-                tasks[taskIndex].start = newStartDate.toISOString();
-                tasks[taskIndex].end = newEndDate.toISOString();
+                if (recalculatedData) {
+                    tasks[taskIndex].start = recalculatedData.start;
+                    tasks[taskIndex].end = recalculatedData.end;
+                    tasks[taskIndex].timeline = recalculatedData.timeline;
+                    tasks[taskIndex].total_days = recalculatedData.total_days;
+                    tasks[taskIndex].total_working_days = recalculatedData.total_days;
+                } else {
+                    tasks[taskIndex].start = newStartDate.toISOString();
+                    tasks[taskIndex].end = newEndDate.toISOString();
+                }
             } else if (draggedUnplannedTask && droppedTaskId === draggedUnplannedTask.id) {
-                // New Task
+                // New Task with recalculated data
                 const newTask = {
                     ...draggedUnplannedTask,
                     lineId: newLineId,
-                    start: newStartDate.toISOString(),
-                    end: newEndDate.toISOString()
                 };
+                if (recalculatedData) {
+                    newTask.start = recalculatedData.start;
+                    newTask.end = recalculatedData.end;
+                    newTask.timeline = recalculatedData.timeline;
+                    newTask.total_days = recalculatedData.total_days;
+                    newTask.total_working_days = recalculatedData.total_days;
+                } else {
+                    newTask.start = newStartDate.toISOString();
+                    newTask.end = newEndDate.toISOString();
+                }
                 tasks.push(newTask);
                 onUnplannedDrop(droppedTaskId);
             }

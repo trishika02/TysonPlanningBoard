@@ -22,3 +22,19 @@ export const getWorkHourData = async () => {
 	const data = await response.json();
 	return data?.message;
 };
+
+export const getStripsWithLearningCurve = async () => {
+	const url = '/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve';
+	try {
+		const response = await fetch(url);
+		if (!response.ok) {
+			console.error('Failed to fetch strips data:', response.statusText);
+			return [];
+		}
+		const data = await response.json();
+		return data?.message || [];
+	} catch (error) {
+		console.error('Error fetching strips data:', error);
+		return [];
+	}
+};
