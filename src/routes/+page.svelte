@@ -68,40 +68,40 @@
             }
 
             let MOCK_FLOORS_LINES = $state([]);
-            // [
-            //     {
-            //         "id":"floor_1",
-            //         "name":"Floor 1",
-            //         "lines": [
-            //                 { id: 'line-1', name: 'Line 01' },
-            //                 { id: 'line-2', name: 'Line 02' },
-            //                 { id: 'line-3', name: 'Line 03' },
-            //                 { id: 'line-4', name: 'Line 04 (Sewing)' },
-            //                 { id: 'line-5', name: 'Line 05' },
-            //                 { id: 'line-6', name: 'Line 06 (Sewing)' },
-            //                 { id: 'line-7', name: 'Line 07 (Finishing)' },
-            //                 { id: 'line-8', name: 'Line 08' },
-            //                 { id: 'line-9', name: 'Line 09' },
-            //                 { id: 'line-10', name: 'Line 10' },
-            //             ]
-            //     },
-            //     {
-            //         "id":"floor_2",
-            //         "name":"Floor 2",
-            //         "lines": [
-            //             { id: 'line-11', name: 'Line 11' },
-            //             { id: 'line-12', name: 'Line 12' },
-            //             { id: 'line-13', name: 'Line 13' },
-            //             { id: 'line-14', name: 'Line 14' },
-            //             { id: 'line-15', name: 'Line 15' },
-            //             { id: 'line-16', name: 'Line 16' },
-            //             { id: 'line-17', name: 'Line 17' },
-            //             { id: 'line-18', name: 'Line 18' },
-            //             { id: 'line-19', name: 'Line 19' },
-            //             { id: 'line-20', name: 'Line 20' },
-            //         ]
-            //     }
-            // ];
+            let test_floor_lines = [
+                {
+                    "id":"floor_1",
+                    "name":"Floor 1",
+                    "lines": [
+                            { id: 'line-1', name: 'Line 01' },
+                            { id: 'line-2', name: 'Line 02' },
+                            { id: 'line-3', name: 'Line 03' },
+                            { id: 'line-4', name: 'Line 04 (Sewing)' },
+                            { id: 'line-5', name: 'Line 05' },
+                            { id: 'line-6', name: 'Line 06 (Sewing)' },
+                            { id: 'line-7', name: 'Line 07 (Finishing)' },
+                            { id: 'line-8', name: 'Line 08' },
+                            { id: 'line-9', name: 'Line 09' },
+                            { id: 'line-10', name: 'Line 10' },
+                        ]
+                },
+                {
+                    "id":"floor_2",
+                    "name":"Floor 2",
+                    "lines": [
+                        { id: 'line-11', name: 'Line 11' },
+                        { id: 'line-12', name: 'Line 12' },
+                        { id: 'line-13', name: 'Line 13' },
+                        { id: 'line-14', name: 'Line 14' },
+                        { id: 'line-15', name: 'Line 15' },
+                        { id: 'line-16', name: 'Line 16' },
+                        { id: 'line-17', name: 'Line 17' },
+                        { id: 'line-18', name: 'Line 18' },
+                        { id: 'line-19', name: 'Line 19' },
+                        { id: 'line-20', name: 'Line 20' },
+                    ]
+                }
+            ];
         
             const MOCK_TASKS = [
                 {
@@ -366,7 +366,8 @@
                 
             onMount(async () => {
                 // Fetch floor and line data from API
-                MOCK_FLOORS_LINES = await get_floor_line_data();
+                // MOCK_FLOORS_LINES = await get_floor_line_data();
+                MOCK_FLOORS_LINES = test_floor_lines;
                 
                 // Init state: Flatten Floors into a single list of rows for Calendar
                 let flatRows = [];
@@ -385,32 +386,35 @@
                 lines = flatRows;
                 
                 // Fetch strips data and work hours from API
-                const [stripsData, fetchedWorkHours] = await Promise.all([
-                    getStripsWithLearningCurve(),
-                    getWorkHourData()
-                ]);
+                // const [stripsData, fetchedWorkHours] = await Promise.all([
+                //     getStripsWithLearningCurve(),
+                //     getWorkHourData()
+                // ]);
+                // console.log({stripsData});
+                const stripsData = []
                 
                 // Store work hours for later recalculation
                 workHoursData = fetchedWorkHours || [];
                 
-                if (stripsData && stripsData.length > 0) {
-                    // Calculate timelines using production system logic
-                    const stripsWithTimelines = calculateStripTimeline(
-                        stripsData,
-                        workHoursData,
-                        today
-                    );
+                // if (stripsData && stripsData.length > 0) {
+                //     // Calculate timelines using production system logic
+                //     const stripsWithTimelines = calculateStripTimeline(
+                //         stripsData,
+                //         workHoursData,
+                //         today
+                //     );
                     
-                    // Transform to application task format
-                    const { planned, unplanned } = transformStripsToTasks(stripsWithTimelines);
+                //     // Transform to application task format
+                //     const { planned, unplanned } = transformStripsToTasks(stripsWithTimelines);
                     
-                    tasks = planned;
-                    unplannedTasks = unplanned;
-                } else {
-                    // Fallback to mock data if API fails
-                    tasks = [...MOCK_TASKS];
-                    // Keep existing unplannedTasks
-                }
+                //     tasks = planned;
+                //     unplannedTasks = unplanned;
+                // } else {
+                //     // Fallback to mock data if API fails
+                //     tasks = [...MOCK_TASKS];
+                //     // Keep existing unplannedTasks
+                // }
+                tasks = [...MOCK_TASKS];
         
                 // Initial setup
                 /*setTimeout(() => {
