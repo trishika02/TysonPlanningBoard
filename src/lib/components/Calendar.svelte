@@ -360,16 +360,17 @@
             return;
         }
 
-        const totalWorkMinutes = workHours * 60;
+        const totalDayMinutes = 24 * 60; // Map to full 24h day to match rendering
         const cellRect = targetCell.getBoundingClientRect();
         const ghostStartX = e.clientX - taskOffsetLeft;
         const dropX = ghostStartX - cellRect.left; 
         const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
-        let newStartOffsetMinutes = Math.floor(percentOffset * totalWorkMinutes);
+        let newStartOffsetMinutes = Math.floor(percentOffset * totalDayMinutes);
         
         // Parse dateStr (YYYY-MM-DD format) and construct date in local time
         const [dragYear, dragMonth, dragDay] = dateStr.split('-').map(Number);
-        const newStartDate = new Date(dragYear, dragMonth - 1, dragDay, START_HOUR, 0, 0, 0);
+        // Start from midnight (00:00) to match renderer
+        const newStartDate = new Date(dragYear, dragMonth - 1, dragDay, 0, 0, 0, 0);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
         // Simple End Date Calculation
@@ -621,16 +622,17 @@
             return;
         }
 
-        const totalWorkMinutes = workHours * 60;
+        const totalDayMinutes = 24 * 60; // Map to full 24h day to match rendering
         const cellRect = targetCell.getBoundingClientRect();
         const ghostStartX = e.clientX - taskOffsetLeft;
         const dropX = ghostStartX - cellRect.left; 
         const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
-        let newStartOffsetMinutes = Math.floor(percentOffset * totalWorkMinutes);
+        let newStartOffsetMinutes = Math.floor(percentOffset * totalDayMinutes);
 
         // Parse dateStr (YYYY-MM-DD format) and construct date in local time
         const [dropYear, dropMonth, dropDay] = dateStr.split('-').map(Number);
-        const newStartDate = new Date(dropYear, dropMonth - 1, dropDay, START_HOUR, 0, 0, 0);
+        // Start from midnight (00:00) to match renderer
+        const newStartDate = new Date(dropYear, dropMonth - 1, dropDay, 0, 0, 0, 0);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
         console.log('=== DROP DATE DEBUG ===');
@@ -744,6 +746,7 @@
         
         // Start from daysBefore days before today
         const startDate = new Date(today);
+        startDate.setHours(0, 0, 0, 0); // Normalize to midnight to ensure correct day alignment
         startDate.setDate(startDate.getDate() - daysBefore);
         
         for (let i = 0; i < totalDays; i++) {
