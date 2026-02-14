@@ -77,24 +77,30 @@
     }
 </script>
 
+
+
 {#if visible}
     <div
         bind:this={menuElement}
-        class="fixed z-[9999] bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden min-w-[180px]"
+        class="fixed z-[9999] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden min-w-[200px] py-1 animation-scale-in"
         style="left: {adjustedX}px; top: {adjustedY}px;"
     >
-        <ul class="py-1">
+        <ul class="flex flex-col">
             {#each menuItems as item}
-                <li>
+                <li class="px-1">
                     <button
-                        class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                        class="w-full text-left px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-3 rounded-md"
                         onclick={() => handleItemClick(item)}
                     >
                         {#if item.icon}
-                            <span class="text-lg">{item.icon}</span>
+                            <span class="text-base w-5 flex justify-center opacity-70">{item.icon}</span>
                         {/if}
                         <span>{item.label}</span>
                     </button>
+                    <!-- Divider logic if needed -->
+                    {#if item.divider}
+                        <div class="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div>
+                    {/if}
                 </li>
             {/each}
         </ul>
@@ -105,5 +111,13 @@
     /* Ensure context menu appears above everything */
     div {
         pointer-events: auto;
+    }
+    .animation-scale-in {
+        animation: scaleIn 0.1s ease-out;
+        transform-origin: top left;
+    }
+    @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
     }
 </style>

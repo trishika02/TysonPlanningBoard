@@ -110,8 +110,8 @@
                     orderId: 'PO-4567',
                     style: 'T-Shirt (Red)',
                     quantity: 5000,
-                    start: '2025-12-04T09:00:00',
-                    end: '2025-12-11T13:30:00',
+                    start: '2026-02-15T09:00:00',
+                    end: '2026-02-22T13:30:00',
                     total_days: 8,
                     total_working_days: 6,
                     completed_days: 3,
@@ -127,8 +127,8 @@
                     orderId: 'PO-4568',
                     style: 'Polo (Blue)',
                     quantity: 3000,
-                    start: '2026-01-15T14:00:00',
-                    end: '2026-01-30T17:00:00',
+                    start: '2026-02-15T14:00:00',
+                    end: '2026-02-22T17:00:00',
                     total_days: 16,
                     total_working_days: 12,
                     completed_days: 5,
@@ -160,8 +160,8 @@
                     orderId: 'PO-4570',
                     style: 'Polo (Green)',
                     quantity: 2000,
-                    start: '2026-01-20T14:00:00',
-                    end: '2026-01-30T17:00:00',
+                    start: '2026-02-20T14:00:00',
+                    end: '2026-02-25T17:00:00',
                     total_days: 11,
                     total_working_days: 8,
                     completed_days: 0,
@@ -174,8 +174,8 @@
                     orderId: 'PO-4571',
                     style: 'Hoodie (Black)',
                     quantity: 1500,
-                    start: '2026-02-01T09:00:00',
-                    end: '2026-02-10T17:00:00',
+                    start: '2026-03-01T09:00:00',
+                    end: '2026-03-10T17:00:00',
                     total_days: 10,
                     total_working_days: 8,
                     completed_days: 0,
@@ -188,8 +188,8 @@
                     orderId: 'PO-4572',
                     style: 'Tank Top (White)',
                     quantity: 5000,
-                    start: '2026-02-05T09:00:00',
-                    end: '2026-02-15T17:00:00',
+                    start: '2026-03-05T09:00:00',
+                    end: '2026-03-15T17:00:00',
                     total_days: 10,
                     total_working_days: 8,
                     completed_days: 0,
@@ -394,7 +394,7 @@
                 const stripsData = []
                 
                 // Store work hours for later recalculation
-                workHoursData = fetchedWorkHours || [];
+                // workHoursData = fetchedWorkHours || [];
                 
                 // if (stripsData && stripsData.length > 0) {
                 //     // Calculate timelines using production system logic
