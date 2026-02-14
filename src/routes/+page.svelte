@@ -110,8 +110,8 @@
                     orderId: 'PO-4567',
                     style: 'T-Shirt (Red)',
                     quantity: 5000,
-                    start: '2026-02-15T09:00:00',
-                    end: '2026-02-22T13:30:00',
+                    start: '2026-02-16T00:00:00',
+                    end: '2026-02-22T00:00:00',
                     total_days: 8,
                     total_working_days: 6,
                     completed_days: 3,
@@ -127,8 +127,8 @@
                     orderId: 'PO-4568',
                     style: 'Polo (Blue)',
                     quantity: 3000,
-                    start: '2026-02-15T14:00:00',
-                    end: '2026-02-22T17:00:00',
+                    start: '2026-02-16T00:00:00',
+                    end: '2026-02-22T00:00:00',
                     total_days: 16,
                     total_working_days: 12,
                     completed_days: 5,
@@ -445,6 +445,23 @@
             {draggedUnplannedTask}
             {workHoursData}
             recalculateTask={(task, newStartDate, newLineId) => {
+                // Check if we have valid work hours data
+                if (!workHoursData || workHoursData.length === 0) {
+                     // FALLBACK: Preserve original duration
+                     const oldStart = new Date(task.start);
+                     const oldEnd = new Date(task.end);
+                     const durationMs = oldEnd.getTime() - oldStart.getTime();
+                     
+                     const newEnd = new Date(newStartDate.getTime() + durationMs);
+                     
+                     return {
+                         start: newStartDate.toISOString(),
+                         end: newEnd.toISOString(),
+                         timeline: task.timeline || [],
+                         total_days: task.total_days || 0
+                     };
+                }
+
                 // Recalculate timeline for dropped task
                 const stripData = {
                     lineId: newLineId,
