@@ -54,6 +54,7 @@
 
     // Drag & Drop State
     let draggedTaskId = null;
+    let isDragging = $state(false); // Reactive state for drag status
     let originalLineId = null;
     let draggedTaskDuration = 0;
     let draggedTaskOffsetLeft = 0;
@@ -265,16 +266,17 @@
     }
 
     // Drag Handlers
-    function handleDragStart(e) {
-        const realTaskId = e.target.dataset.taskId;
-        if (!realTaskId) {
-            console.error("Dragged element is not a task.");
+    function handleDragStart(e, taskPtr) {
+        if (!taskPtr) {
+            console.error("Drag start called without task object.");
             e.preventDefault();
             return;
         }
 
-        draggedTaskId = realTaskId;
-        const task = tasks.find(t => t.id === draggedTaskId);
+        draggedTaskId = taskPtr.id;
+        // Verify we have the latest task state from the array (in case taskPtr is stale, though unlikely in this flow)
+        const task = tasks.find(t => t.id === draggedTaskId) || taskPtr;
+        
         originalLineId = task.lineId;
         
         const taskRect = e.target.getBoundingClientRect();
@@ -316,8 +318,14 @@
             document.body.removeChild(dragImage);
         }, 0);
 
+        // Disable pointer-events on all tasks during drag so events reach grid cells.
+        // Controlled reactively via isDragging passed to Task components.
+        // We use setTimeout to ensure the browser has fully initialized the drag operation
+        // before we modify the element's pointer-events.
         setTimeout(() => {
-            e.target.classList.add('dragging');
+            isDragging = true;
+            console.log('--- Drag Start Initiated ---');
+            console.log('Dragged Task ID:', draggedTaskId);
         }, 0);
 
         if (ghostTaskElement) ghostTaskElement.remove();
@@ -325,10 +333,14 @@
 
         ghostTaskElement = document.createElement('div');
         ghostTaskElement.id = 'ghost-task';
-        const taskEl = e.target;
-        ghostTaskElement.style.top = taskEl.style.top;
-        ghostTaskElement.style.left = taskEl.style.left;
-        ghostTaskElement.style.width = taskEl.style.width;
+        ghostTaskElement.style.pointerEvents = 'none';
+        
+        // Use the found element (root)
+        const sourceEl = e.target.closest('.task') || e.target;
+        
+        ghostTaskElement.style.top = sourceEl.style.top;
+        ghostTaskElement.style.left = sourceEl.style.left;
+        ghostTaskElement.style.width = sourceEl.style.width;
         const height = ROW_HEIGHT - FOOTER_HEIGHT - 10;
         ghostTaskElement.style.height = `${height}px`;
         ghostTaskElement.classList.add('valid');
@@ -345,7 +357,7 @@
         dragOutlineElement.style.backgroundColor = 'rgba(224, 242, 254, 0.5)';
         dragOutlineElement.style.boxSizing = 'border-box';
         // Initial position matching task
-        const initDayIndex = Math.floor(parseFloat(taskEl.style.left) / DAY_COLUMN_WIDTH);
+        const initDayIndex = Math.floor(parseFloat(sourceEl.style.left) / DAY_COLUMN_WIDTH);
         const lineIndex = lines.findIndex(l => l.id === task.lineId);
         dragOutlineElement.style.left = `${initDayIndex * DAY_COLUMN_WIDTH}px`;
         dragOutlineElement.style.top = `${lineIndex * ROW_HEIGHT}px`;
@@ -355,6 +367,41 @@
         if (grid) {
             grid.appendChild(ghostTaskElement);
             grid.appendChild(dragOutlineElement);
+        }
+    }
+
+    function createGhostTask(width, top, left, label = '') {
+        ghostTaskElement = document.createElement('div');
+        ghostTaskElement.id = 'ghost-task';
+        ghostTaskElement.style.pointerEvents = 'none';
+        
+        // Match standard task styling for unplanned ghost
+        ghostTaskElement.style.position = 'absolute';
+        ghostTaskElement.style.backgroundColor = 'rgba(59, 130, 246, 0.5)'; // blue-500 with opacity
+        ghostTaskElement.style.border = '1px dashed #2563eb'; // blue-600
+        ghostTaskElement.style.borderRadius = '0.375rem'; // rounded-md
+        
+        ghostTaskElement.style.width = width;
+        ghostTaskElement.style.top = top;
+        ghostTaskElement.style.left = left;
+        const height = ROW_HEIGHT - FOOTER_HEIGHT - 10; // Match task height calculation
+        ghostTaskElement.style.height = `${height}px`;
+        ghostTaskElement.classList.add('valid');
+        ghostTaskElement.style.zIndex = '50'; // Ensure it's above grid lines but below some overlays
+
+        if (label) {
+             ghostTaskElement.textContent = label;
+             ghostTaskElement.style.display = 'flex';
+             ghostTaskElement.style.alignItems = 'center';
+             ghostTaskElement.style.justifyContent = 'center';
+             ghostTaskElement.style.color = '#fff';
+             ghostTaskElement.style.fontSize = '12px';
+             ghostTaskElement.style.overflow = 'hidden';
+        }
+
+        const grid = document.getElementById('calendar-grid');
+        if (grid) {
+            grid.appendChild(ghostTaskElement);
         }
     }
 
@@ -427,6 +474,7 @@
         }
 
         // --- VALIDATION (runs after positioning so visuals are never delayed) ---
+        const leftEdgeDay = calendarDays[dayIndex];
         const baseDate = new Date(leftEdgeDay.date);
         const workHoursForDay = getLineWorkHours(baseDate, newLineId);
         const isLeftEdgeBlocked = leftEdgeDay.isBlocked || workHoursForDay === 0;
@@ -448,6 +496,7 @@
     }
 
     function handleDragEnd(e) {
+        console.log('--- handleDragEnd ---');
         if (ghostTaskElement) {
             ghostTaskElement.remove();
             ghostTaskElement = null;
@@ -456,6 +505,10 @@
             dragOutlineElement.remove();
             dragOutlineElement = null;
         }
+        
+        // Re-enable pointer-events on tasks
+        isDragging = false;
+        
         draggedTaskId = null;
         originalLineId = null;
         draggedTaskOffsetLeft = 0;
@@ -648,9 +701,12 @@
 
         // Fallback or override if it's an unplanned task
         if (!droppedTaskId && draggedUnplannedTask) {
+             console.log('Using draggedUnplannedTask for drop:', draggedUnplannedTask);
              droppedTaskId = draggedUnplannedTask.id;
              durationMs = (draggedUnplannedTask.total_days || 1) * 24 * 60 * 60 * 1000;
         }
+
+        console.log('handleDrop: droppedTaskId:', droppedTaskId, 'draggedUnplannedTask:', draggedUnplannedTask);
 
         if (isBlocked) {
             console.warn("Cannot drop on a blocked day!");
@@ -1065,7 +1121,7 @@
             </div>
 
             <!-- 2. Tasks Layer (Managed by Svelte) -->
-            <div id="tasks-layer" class="absolute inset-0 z-10 pointer-events-none">
+            <div id="tasks-layer" class="absolute inset-0 z-10 pointer-events-none" class:drag-active={isDragging}>
                 <!-- Tasks rendered by Svelte loop -->
                 {#each tasks as task (task.id)}
                     {@const isCandidate = showMergeModal && mergeCandidates.some(t => t.id === task.id)}
@@ -1078,7 +1134,8 @@
                             style={getTaskStyle(task)}
                             isMergeCandidate={isCandidate}
                             isDimmed={isDimmed}
-                            onDragStart={(e) => handleDragStart(e)}
+                            isBoardDragging={isDragging}
+                            onDragStart={(e) => handleDragStart(e, task)}
                             onDragEnd={(e) => handleDragEnd(e)}
                             onClick={(e, t) => {
                                 if (isCandidate) handleMergeTask(t);
@@ -1122,3 +1179,10 @@
         onCancel={handleMergeModalCancel}
     />
 </div>
+
+<style>
+    /* During drag, disable pointer-events on all tasks so drag/drop events reach grid cells */
+    :global(#tasks-layer.drag-active .task) {
+        pointer-events: none !important;
+    }
+</style>
