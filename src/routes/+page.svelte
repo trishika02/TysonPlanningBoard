@@ -289,7 +289,8 @@
                 document.body.appendChild(dragImage);
                 const w = dragImage.offsetWidth;
                 const h = dragImage.offsetHeight;
-                e.dataTransfer.setDragImage(dragImage, Math.floor(w / 2), Math.floor(h / 2));
+                // Set offset to 0 for x-axis so drag image left edge aligns with mouse (task's x0 position)
+                e.dataTransfer.setDragImage(dragImage, 0, Math.floor(h / 2));
                 e.target._unplannedDragImage = dragImage;
             }
 

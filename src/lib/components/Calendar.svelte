@@ -56,7 +56,13 @@
     let draggedTaskId = null;
     let originalLineId = null;
     let draggedTaskDuration = 0;
+    let draggedTaskOffsetLeft = 0;
+    let draggedTaskDurationMs = 0;
     let ghostTaskElement = null;
+    let dragOutlineElement = null; // Positioned overlay for cell highlight (no class toggling)
+    // Cached DOM refs for drag performance (avoid getBoundingClientRect on every dragover)
+    let cachedGridRect = null;
+    let cachedCalendarBody = null;
 
     // Context Menu & Split Modal State
     let showContextMenu = $state(false);
@@ -272,26 +278,51 @@
         originalLineId = task.lineId;
         
         const taskRect = e.target.getBoundingClientRect();
+        // Cache grid rect and body element for the entire drag (avoids reflow on every dragover)
+        cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+        cachedCalendarBody = document.getElementById('calendar-body');
+        // Calculate where the user clicked relative to the task's left edge
         const taskOffsetLeft = e.clientX - taskRect.left;
+        draggedTaskOffsetLeft = taskOffsetLeft;
 
         const taskStart = new Date(task.start);
         const taskEnd = new Date(task.end);
-        
+
         // ABSOLUTE DURATION: Simple difference
         const durationMs = taskEnd.getTime() - taskStart.getTime();
-        
+        draggedTaskDurationMs = durationMs;
+
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', JSON.stringify({
             id: draggedTaskId,
             durationMs: durationMs,
             taskOffsetLeft: taskOffsetLeft
         }));
-        
+
+        // Create a custom drag image that shows the task at the correct offset
+        const dragImage = e.target.cloneNode(true);
+        dragImage.style.position = 'absolute';
+        dragImage.style.top = '-9999px';
+        dragImage.style.opacity = '1';
+        document.body.appendChild(dragImage);
+
+        // Set drag image offset so the cursor is at the grab point
+        // This makes the left edge appear at mouseX - taskOffsetLeft
+        const dragImageOffsetY = e.clientY - taskRect.top;
+        e.dataTransfer.setDragImage(dragImage, taskOffsetLeft, dragImageOffsetY);
+
+        // Clean up the temporary drag image after a short delay
+        setTimeout(() => {
+            document.body.removeChild(dragImage);
+        }, 0);
+
         setTimeout(() => {
             e.target.classList.add('dragging');
         }, 0);
 
         if (ghostTaskElement) ghostTaskElement.remove();
+        if (dragOutlineElement) dragOutlineElement.remove();
+
         ghostTaskElement = document.createElement('div');
         ghostTaskElement.id = 'ghost-task';
         const taskEl = e.target;
@@ -300,103 +331,112 @@
         ghostTaskElement.style.width = taskEl.style.width;
         const height = ROW_HEIGHT - FOOTER_HEIGHT - 10;
         ghostTaskElement.style.height = `${height}px`;
-        ghostTaskElement.classList.add('valid'); 
-        
-        // Append ghost to grid
+        ghostTaskElement.classList.add('valid');
+
+        // Create outline overlay (positioned element, moves with ghost — no class toggling)
+        dragOutlineElement = document.createElement('div');
+        dragOutlineElement.id = 'drag-outline';
+        dragOutlineElement.style.position = 'absolute';
+        dragOutlineElement.style.zIndex = '5';
+        dragOutlineElement.style.pointerEvents = 'none';
+        dragOutlineElement.style.width = `${DAY_COLUMN_WIDTH}px`;
+        dragOutlineElement.style.height = `${ROW_HEIGHT}px`;
+        dragOutlineElement.style.outline = '2px dashed #0ea5e9';
+        dragOutlineElement.style.backgroundColor = 'rgba(224, 242, 254, 0.5)';
+        dragOutlineElement.style.boxSizing = 'border-box';
+        // Initial position matching task
+        const initDayIndex = Math.floor(parseFloat(taskEl.style.left) / DAY_COLUMN_WIDTH);
+        const lineIndex = lines.findIndex(l => l.id === task.lineId);
+        dragOutlineElement.style.left = `${initDayIndex * DAY_COLUMN_WIDTH}px`;
+        dragOutlineElement.style.top = `${lineIndex * ROW_HEIGHT}px`;
+
+        // Append both to grid
         const grid = document.getElementById('calendar-grid');
-        if (grid) grid.appendChild(ghostTaskElement);
+        if (grid) {
+            grid.appendChild(ghostTaskElement);
+            grid.appendChild(dragOutlineElement);
+        }
     }
 
     function handleDragOver(e) {
         e.preventDefault();
         const targetCell = e.target.closest('.grid-cell');
-        
+
         // --- UNPLANNED TASK GHOST CREATION ---
         if (!draggedTaskId && draggedUnplannedTask && !ghostTaskElement) {
              const estimatedWidth = (draggedUnplannedTask.total_days || 1) * DAY_COLUMN_WIDTH;
-             // Position initial ghost roughly at mouse just to have it
-             const gridRect = document.getElementById('calendar-grid').getBoundingClientRect();
-             const relX = e.clientX - gridRect.left;
-             const relY = e.clientY - gridRect.top;
+             if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+             if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
+             const relX = e.clientX - cachedGridRect.left;
+             const relY = e.clientY - cachedGridRect.top;
              createGhostTask(`${estimatedWidth}px`, `${relY}px`, `${relX}px`);
         }
 
         if (!targetCell || !ghostTaskElement) return;
 
+        // Get line info from the cell under the mouse
         const newLineId = targetCell.dataset.lineId;
-        const dateStr = targetCell.dataset.date;
         const isBlocked = targetCell.dataset.isBlocked === 'true';
 
         let activeTaskId = draggedTaskId;
-        let durationMs = 0;
-        let taskOffsetLeft = 0;
-
-        // Try getting data from dataTransfer or Fallback to state
-        try {
-            const data = e.dataTransfer.getData('text/plain');
-            if (data) {
-                const parsed = JSON.parse(data);
-                durationMs = parsed.durationMs;
-                taskOffsetLeft = parsed.taskOffsetLeft;
-            }
-        } catch (err) {}
+        let durationMs = draggedTaskDurationMs;
+        let taskOffsetLeft = draggedTaskOffsetLeft;
 
         if (!activeTaskId && draggedUnplannedTask) {
              activeTaskId = draggedUnplannedTask.id;
-             // If we couldn't get duration from dataTransfer (likely), calc it
              if (!durationMs) {
                 durationMs = (draggedUnplannedTask.total_days || 1) * 24 * 60 * 60 * 1000;
              }
         }
-        
-        const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
-        const workHours = getLineWorkHours(new Date(dateStr), newLineId);
-        
-        if (isBlocked || !day || workHours === 0) {
+
+        // Use cached grid rect (avoids forced layout reflow on every dragover)
+        if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+        if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
+        const mouseX = e.clientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
+        const taskLeftPixel = mouseX - taskOffsetLeft;
+
+        // Calculate which date/time this pixel position corresponds to
+        const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
+        const dayIndex = Math.floor(dayIndexFloat);
+        const dayFraction = dayIndexFloat - dayIndex;
+
+        if (dayIndex < 0 || dayIndex >= calendarDays.length) {
             ghostTaskElement.classList.remove('valid');
             ghostTaskElement.classList.add('invalid');
             e.dataTransfer.dropEffect = 'none';
-            targetCell.classList.add('drag-over'); 
+            if (dragOutlineElement) dragOutlineElement.style.display = 'none';
             return;
         }
 
-        const totalDayMinutes = 24 * 60; // Map to full 24h day to match rendering
-        const cellRect = targetCell.getBoundingClientRect();
-        const ghostStartX = e.clientX - taskOffsetLeft;
-        const dropX = ghostStartX - cellRect.left; 
-        const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
-        let newStartOffsetMinutes = Math.floor(percentOffset * totalDayMinutes);
-        
-        // Parse dateStr (YYYY-MM-DD format) and construct date in local time
-        const [dragYear, dragMonth, dragDay] = dateStr.split('-').map(Number);
-        // Start from midnight (00:00) to match renderer
-        const newStartDate = new Date(dragYear, dragMonth - 1, dragDay, 0, 0, 0, 0);
-        newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
-
-        // Simple End Date Calculation
-        const newEndDate = new Date(newStartDate.getTime() + durationMs);
-        
-        const hasOverlap = isOverlapping(activeTaskId, newLineId, newStartDate, newEndDate);
-        
-        const startPixel = getPixelOffsetForDate(newStartDate, newLineId);
-        const endPixel = getPixelOffsetForDate(newEndDate, newLineId);
-        
-        if (startPixel === null || endPixel === null) {
-            ghostTaskElement.classList.remove('valid');
-            ghostTaskElement.classList.add('invalid');
-            e.dataTransfer.dropEffect = 'none';
-            return;
-        }
-
-        const newWidth = endPixel - startPixel;
+        // --- FAST PATH: Position ghost + outline with pure style updates (same paint frame) ---
         const lineIndex = lines.findIndex(l => l.id === newLineId);
         const newTop = (lineIndex * ROW_HEIGHT) + 10;
-        
-        ghostTaskElement.style.left = `${startPixel}px`;
+
+        // Position ghost (pixel-precise, updates every frame)
+        const durationDays = durationMs / (1000 * 60 * 60 * 24);
+        const newWidth = durationDays * DAY_COLUMN_WIDTH;
+        ghostTaskElement.style.left = `${taskLeftPixel}px`;
         ghostTaskElement.style.width = `${newWidth}px`;
         ghostTaskElement.style.top = `${newTop}px`;
 
-        if (hasOverlap) {
+        // Position outline overlay (snaps to cell grid, same style update as ghost — zero lag)
+        if (dragOutlineElement) {
+            dragOutlineElement.style.left = `${dayIndex * DAY_COLUMN_WIDTH}px`;
+            dragOutlineElement.style.top = `${lineIndex * ROW_HEIGHT}px`;
+            dragOutlineElement.style.display = '';
+        }
+
+        // --- VALIDATION (runs after positioning so visuals are never delayed) ---
+        const baseDate = new Date(leftEdgeDay.date);
+        const workHoursForDay = getLineWorkHours(baseDate, newLineId);
+        const isLeftEdgeBlocked = leftEdgeDay.isBlocked || workHoursForDay === 0;
+
+        const minutesIntoDay = dayFraction * 24 * 60;
+        const newStartDate = new Date(baseDate.getTime() + minutesIntoDay * 60 * 1000);
+        const newEndDate = new Date(newStartDate.getTime() + durationMs);
+        const hasOverlap = isOverlapping(activeTaskId, newLineId, newStartDate, newEndDate);
+
+        if (isLeftEdgeBlocked || hasOverlap) {
             ghostTaskElement.classList.remove('valid');
             ghostTaskElement.classList.add('invalid');
             e.dataTransfer.dropEffect = 'none';
@@ -405,7 +445,6 @@
             ghostTaskElement.classList.add('valid');
             e.dataTransfer.dropEffect = 'move';
         }
-        targetCell.classList.add('drag-over');
     }
 
     function handleDragEnd(e) {
@@ -413,18 +452,22 @@
             ghostTaskElement.remove();
             ghostTaskElement = null;
         }
-        if (draggedTaskId) {
-            // Because of Svelte re-render, class removal might be automatic or handled by component
+        if (dragOutlineElement) {
+            dragOutlineElement.remove();
+            dragOutlineElement = null;
         }
         draggedTaskId = null;
         originalLineId = null;
+        draggedTaskOffsetLeft = 0;
+        draggedTaskDurationMs = 0;
+        cachedGridRect = null;
+        cachedCalendarBody = null;
     }
 
     function handleDragLeave(e) {
-        const targetCell = e.target.closest('.grid-cell');
-        if (targetCell) {
-            targetCell.classList.remove('drag-over');
-        }
+        // Don't remove drag-over here — handleDragOver manages the outline
+        // based on the ghost task's left edge position, not the mouse position.
+        // Cleanup is handled by handleDragEnd when the drag finishes.
     }
 
     // Context Menu Handlers (use clientX/clientY so menu appears at cursor/task with position:fixed)
@@ -622,22 +665,33 @@
             return;
         }
 
-        const totalDayMinutes = 24 * 60; // Map to full 24h day to match rendering
-        const cellRect = targetCell.getBoundingClientRect();
-        const ghostStartX = e.clientX - taskOffsetLeft;
-        const dropX = ghostStartX - cellRect.left; 
-        const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
-        let newStartOffsetMinutes = Math.floor(percentOffset * totalDayMinutes);
+        // Calculate task position based on mouse position minus the grab offset
+        const gridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+        const mouseX = e.clientX - gridRect.left + document.getElementById('calendar-body').scrollLeft;
+        const taskLeftPixel = mouseX - taskOffsetLeft;
 
-        // Parse dateStr (YYYY-MM-DD format) and construct date in local time
-        const [dropYear, dropMonth, dropDay] = dateStr.split('-').map(Number);
-        // Start from midnight (00:00) to match renderer
-        const newStartDate = new Date(dropYear, dropMonth - 1, dropDay, 0, 0, 0, 0);
-        newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
+        // Calculate which date/time this pixel position corresponds to
+        const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
+        const dayIndex = Math.floor(dayIndexFloat);
+        const dayFraction = dayIndexFloat - dayIndex;
+
+        if (dayIndex < 0 || dayIndex >= calendarDays.length) {
+            console.warn("Drop position out of calendar bounds");
+            return;
+        }
+
+        const baseDate = new Date(calendarDays[dayIndex].date);
+
+        // Calculate time within the day based on the fraction
+        const minutesIntoDay = dayFraction * 24 * 60; // Total minutes into the day
+        const newStartDate = new Date(baseDate.getTime() + minutesIntoDay * 60 * 1000);
 
         console.log('=== DROP DATE DEBUG ===');
         console.log('dateStr from cell:', dateStr);
-        console.log('Parsed: year:', dropYear, 'month:', dropMonth, 'day:', dropDay);
+        console.log('Mouse X:', mouseX);
+        console.log('Task Offset Left:', taskOffsetLeft);
+        console.log('Task Left Pixel:', taskLeftPixel);
+        console.log('Day Index:', dayIndex, 'Day Fraction:', dayFraction);
         console.log('newStartDate constructed:', newStartDate.toISOString());
         console.log('newStartDate local:', newStartDate.toString());
         console.log('======================');

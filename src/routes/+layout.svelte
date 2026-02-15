@@ -16,7 +16,7 @@
 	<!-- Top Navigation Bar -->
 	<nav class="w-[90%] bg-white shadow-sm rounded-b-lg px-6 py-4 mb-6 flex justify-between items-center border border-gray-100">
 		<div class="flex items-center space-x-8">
-			<h1 class="text-xl font-bold text-gray-800 tracking-tight">AltarSense</h1>
+			<h1 class="text-xl font-bold text-gray-800 tracking-tight">ALTERSENSE</h1>
 			<div class="flex space-x-2">
 				<button class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-md hover:bg-blue-50">Planning</button>
 				<button class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-md hover:bg-blue-50">Reports</button>
