@@ -3,6 +3,7 @@
     import Task from '$lib/components/Task.svelte';
     import ContextMenu from '$lib/components/ContextMenu.svelte';
     import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
+    import MergeTaskModal from '$lib/components/MergeTaskModal.svelte';
 	import { work_hour_data } from '$lib/stores/data';
 	import { getWorkHourData } from '$lib/api-call';
 
@@ -64,6 +65,9 @@
     let selectedTaskForContext = $state(null);
     let showSplitModal = $state(false);
     let selectedTaskForSplit = $state(null);
+    let showMergeModal = $state(false);
+    let selectedTaskForMerge = $state(null);
+    let mergeCandidates = $state([]);
 
     // Helpers
     function getStandardWorkHours(dayOfWeek) {
@@ -356,16 +360,17 @@
             return;
         }
 
-        const totalWorkMinutes = workHours * 60;
+        const totalDayMinutes = 24 * 60; // Map to full 24h day to match rendering
         const cellRect = targetCell.getBoundingClientRect();
         const ghostStartX = e.clientX - taskOffsetLeft;
         const dropX = ghostStartX - cellRect.left; 
         const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
-        let newStartOffsetMinutes = Math.floor(percentOffset * totalWorkMinutes);
+        let newStartOffsetMinutes = Math.floor(percentOffset * totalDayMinutes);
         
         // Parse dateStr (YYYY-MM-DD format) and construct date in local time
         const [dragYear, dragMonth, dragDay] = dateStr.split('-').map(Number);
-        const newStartDate = new Date(dragYear, dragMonth - 1, dragDay, START_HOUR, 0, 0, 0);
+        // Start from midnight (00:00) to match renderer
+        const newStartDate = new Date(dragYear, dragMonth - 1, dragDay, 0, 0, 0, 0);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
         // Simple End Date Calculation
@@ -437,6 +442,15 @@
         if (item.id === 'split' && selectedTaskForContext) {
             selectedTaskForSplit = selectedTaskForContext;
             showSplitModal = true;
+        } else if (item.id === 'merge' && selectedTaskForContext) {
+             // Show ALL other tasks as candidates (as per user request "show other task from MOCK_TASKS")
+             // We can visually distinguish matching/non-matching in the modal if needed, 
+             // but for now we won't filter them out.
+             const candidates = tasks.filter(t => t.id !== selectedTaskForContext.id);
+            
+            selectedTaskForMerge = selectedTaskForContext;
+            mergeCandidates = candidates;
+            showMergeModal = true;
         }
         showContextMenu = false;
     }
@@ -452,29 +466,57 @@
         const originalTask = tasks.find(t => t.id === selectedTaskForSplit.id);
         if (!originalTask) return;
 
-        // Generate new task ID
-        const newTaskId = `${originalTask.id}-split-${Date.now()}`;
+        // 1. Reduce original task quantity
+        const oldQuantity = originalTask.quantity;
+        const newOriginalQuantity = oldQuantity - splitQuantity;
+        
+        if (newOriginalQuantity <= 0) {
+            console.error("Cannot split more than available quantity");
+            return;
+        }
 
-        // Calculate proportional dates for the new task (same as original for now)
+        originalTask.quantity = newOriginalQuantity;
+
+        // 2. Do NOT recalculate ORIGINAL task duration/end date (User requirement: "current task should be the same start and end day")
+        // We only updated quantity.
+
+        // 3. Create NEW task
+        const newTaskId = `${originalTask.id}-split-${Date.now()}`;
+        
+        // User Request: "new task sholud be start on current task end day and end day would be 2 days after the stertting day"
+        const newTaskStart = new Date(originalTask.end);
+        const newTaskEnd = new Date(newTaskStart);
+        newTaskEnd.setDate(newTaskEnd.getDate() + 2);
+
         const newTask = {
             ...originalTask,
             id: newTaskId,
             quantity: splitQuantity,
             completed_quantity: 0,
             completed_segments: [],
-            // Keep the same start/end dates and position - user can drag it afterward
+            start: newTaskStart.toISOString(),
+            end: newTaskEnd.toISOString(),
+            total_days: 2, // Approximate
+            total_working_days: 2 // Approximate
         };
 
-        // Reduce original task quantity
-        originalTask.quantity = originalTask.quantity - splitQuantity;
-        
-        // Adjust completed_quantity if it exceeds new quantity
+        // Adjust completed_quantity of original if it exceeds new quantity
         if (originalTask.completed_quantity > originalTask.quantity) {
             originalTask.completed_quantity = originalTask.quantity;
         }
 
+        console.log('--- SPLIT TASK DEBUG ---');
+        console.log('Original Task Start:', originalTask.start);
+        console.log('Original Task End:', originalTask.end);
+        console.log('New Task Start:', newTask.start);
+        console.log('New Task End:', newTask.end);
+        console.log('------------------------');
+
         // Add new task to tasks array
         tasks.push(newTask);
+        tasks = [...tasks]; // Trigger reactivity
+
+        console.log('MOCK_TASKS after split:', JSON.parse(JSON.stringify(tasks)));
 
         // Close modal and reset state
         showSplitModal = false;
@@ -484,6 +526,53 @@
     function handleSplitModalCancel() {
         showSplitModal = false;
         selectedTaskForSplit = null;
+    }
+
+    function handleMergeTask(targetTask) {
+        if (!selectedTaskForMerge || !targetTask) return;
+
+        const sourceTask = tasks.find(t => t.id === selectedTaskForMerge.id);
+        const targetTaskIndex = tasks.findIndex(t => t.id === targetTask.id);
+
+        if (!sourceTask || targetTaskIndex === -1) return;
+
+        // Merge logic: Absorb target into source
+        // 1. Update source quantity
+        const newQuantity = sourceTask.quantity + targetTask.quantity;
+        sourceTask.quantity = newQuantity;
+        
+        // 2. Remove target task
+        tasks.splice(targetTaskIndex, 1);
+        
+        // 3. User Logic: Sum of days
+        const addedDays = Number(targetTask.total_days) || 0;
+        const currentDays = Number(sourceTask.total_days) || 0;
+        
+        sourceTask.total_days = currentDays + addedDays;
+        sourceTask.total_working_days = (Number(sourceTask.total_working_days) || 0) + (Number(targetTask.total_working_days) || 0);
+
+        // Calculate new end date based on new total_days
+        const sourceStart = new Date(sourceTask.start);
+        const newEnd = new Date(sourceStart);
+        newEnd.setDate(newEnd.getDate() + sourceTask.total_days);
+        
+        sourceTask.end = newEnd.toISOString();
+        
+        tasks = [...tasks]; // Trigger reactivity
+
+        // Log the updated MOCK_TASKS (tasks array)
+        console.log('MOCK_TASKS after merge:', JSON.parse(JSON.stringify(tasks)));
+
+        // Close modal
+        showMergeModal = false;
+        selectedTaskForMerge = null;
+        mergeCandidates = [];
+    }
+
+    function handleMergeModalCancel() {
+        showMergeModal = false;
+        selectedTaskForMerge = null;
+        mergeCandidates = [];
     }
 
     function handleDrop(e) {
@@ -533,16 +622,17 @@
             return;
         }
 
-        const totalWorkMinutes = workHours * 60;
+        const totalDayMinutes = 24 * 60; // Map to full 24h day to match rendering
         const cellRect = targetCell.getBoundingClientRect();
         const ghostStartX = e.clientX - taskOffsetLeft;
         const dropX = ghostStartX - cellRect.left; 
         const percentOffset = Math.max(0, Math.min(1, dropX / DAY_COLUMN_WIDTH));
-        let newStartOffsetMinutes = Math.floor(percentOffset * totalWorkMinutes);
+        let newStartOffsetMinutes = Math.floor(percentOffset * totalDayMinutes);
 
         // Parse dateStr (YYYY-MM-DD format) and construct date in local time
         const [dropYear, dropMonth, dropDay] = dateStr.split('-').map(Number);
-        const newStartDate = new Date(dropYear, dropMonth - 1, dropDay, START_HOUR, 0, 0, 0);
+        // Start from midnight (00:00) to match renderer
+        const newStartDate = new Date(dropYear, dropMonth - 1, dropDay, 0, 0, 0, 0);
         newStartDate.setMinutes(newStartDate.getMinutes() + newStartOffsetMinutes);
 
         console.log('=== DROP DATE DEBUG ===');
@@ -626,6 +716,8 @@
             ghostTaskElement.remove();
             ghostTaskElement = null;
         }
+
+        console.log('MOCK_TASKS after drop:', JSON.parse(JSON.stringify(tasks)));
     }
 
     function renderBoard() {
@@ -654,6 +746,7 @@
         
         // Start from daysBefore days before today
         const startDate = new Date(today);
+        startDate.setHours(0, 0, 0, 0); // Normalize to midnight to ensure correct day alignment
         startDate.setDate(startDate.getDate() - daysBefore);
         
         for (let i = 0; i < totalDays; i++) {
@@ -921,12 +1014,21 @@
             <div id="tasks-layer" class="absolute inset-0 z-10 pointer-events-none">
                 <!-- Tasks rendered by Svelte loop -->
                 {#each tasks as task (task.id)}
+                    {@const isCandidate = showMergeModal && mergeCandidates.some(t => t.id === task.id)}
+                    {@const isSource = showMergeModal && selectedTaskForMerge && selectedTaskForMerge.id === task.id}
+                    {@const isDimmed = showMergeModal && !isCandidate && !isSource}
+                    
                     {#if getTaskStyle(task)}
                         <Task 
                             {task}
                             style={getTaskStyle(task)}
+                            isMergeCandidate={isCandidate}
+                            isDimmed={isDimmed}
                             onDragStart={(e) => handleDragStart(e)}
                             onDragEnd={(e) => handleDragEnd(e)}
+                            onClick={(e, t) => {
+                                if (isCandidate) handleMergeTask(t);
+                            }}
                             onContextMenu={(e, task) => handleTaskContextMenu(e, task)}
                             {formatDate}
                         />
@@ -942,7 +1044,8 @@
         x={contextMenuX}
         y={contextMenuY}
         menuItems={[
-            { id: 'split', label: 'Split Task', icon: '✂️' }
+            { id: 'split', label: 'Split Task', icon: '✂️' },
+            { id: 'merge', label: 'Merge Task', icon: '🔗' }
         ]}
         onItemClick={handleContextMenuItemClick}
         onClose={handleContextMenuClose}
@@ -954,5 +1057,14 @@
         task={selectedTaskForSplit}
         onSubmit={handleSplitTask}
         onCancel={handleSplitModalCancel}
+    />
+
+    <!-- Merge Task Modal -->
+    <MergeTaskModal 
+        bind:visible={showMergeModal}
+        sourceTask={selectedTaskForMerge}
+        candidates={mergeCandidates}
+        onMerge={handleMergeTask}
+        onCancel={handleMergeModalCancel}
     />
 </div>

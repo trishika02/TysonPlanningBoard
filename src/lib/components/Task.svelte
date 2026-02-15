@@ -2,9 +2,23 @@
 <script>
     import { tooltipStore } from '$lib/stores/tooltipStore.svelte.js';
 
-    let { task, style, onDragStart, onDragEnd, onContextMenu, formatDate } = $props();
+    let { 
+        task, 
+        style, 
+        onDragStart, 
+        onDragEnd, 
+        onContextMenu, 
+        formatDate,
+        onClick = null,
+        isMergeCandidate = false,
+        isDimmed = false 
+    } = $props();
 
     function handleDragStart(e) {
+        if (isDimmed) {
+            e.preventDefault();
+            return;
+        }
         tooltipStore.hide();
         // Invoke parent handler to set up dataTransfer
         onDragStart(e);
@@ -14,11 +28,19 @@
              e.target.classList.add('dragging');
         }, 0);
     }
+    
+    function handleClick(e) {
+        if (onClick) {
+            e.stopPropagation();
+            onClick(e, task);
+        }
+    }
 
     function handleDragEnd(e) {
         e.target.classList.remove('dragging');
         onDragEnd(e);
     }
+
 
     function handleSegmentEnter(e, segment) {
         e.stopPropagation();
@@ -93,11 +115,21 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     id="{task.id}-task"
-    class="task absolute border border-blue-900/10 rounded text-white shadow-sm overflow-hidden cursor-grab active:cursor-grabbing z-10 pointer-events-auto flex items-center justify-center px-2"
+    class="task absolute border border-blue-900/10 rounded text-white shadow-sm overflow-hidden cursor-grab active:cursor-grabbing z-10 pointer-events-auto flex items-center justify-center px-2 transition-all duration-300
+    {isMergeCandidate ? 'ring-4 ring-green-400 ring-offset-2 z-50 scale-105 cursor-pointer !bg-green-500' : ''} 
+    {isDimmed ? 'opacity-20 grayscale pointer-events-none' : ''}"
     style="{style} {getBackgroundStyle()}"
-    draggable="true"
+    draggable={!isDimmed && !isMergeCandidate}
+    role="button"
+    tabindex="0"
     ondragstart={handleDragStart}
     ondragend={handleDragEnd}
+    onclick={handleClick}
+    onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            handleClick(e);
+        }
+    }}
     oncontextmenu={handleContextMenu}
     onmouseenter={handleRemainingEnter}
     onmousemove={handleMouseMove}
