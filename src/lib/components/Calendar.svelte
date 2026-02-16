@@ -64,6 +64,14 @@
     // Cached DOM refs for drag performance (avoid getBoundingClientRect on every dragover)
     let cachedGridRect = null;
     let cachedCalendarBody = null;
+    // RAF-based drag throttling (cap visual updates to 1 per animation frame)
+    let dragOverRAF = null;
+    let lastDragClientX = 0;
+    let lastDragClientY = 0;
+    // Cell-change cache: skip heavy validation when still hovering same cell
+    let lastValidatedDayIndex = -1;
+    let lastValidatedLineIndex = -1;
+    let gridListenersAttached = false;
 
     // Context Menu & Split Modal State
     let showContextMenu = $state(false);
@@ -334,10 +342,12 @@
         ghostTaskElement = document.createElement('div');
         ghostTaskElement.id = 'ghost-task';
         ghostTaskElement.style.pointerEvents = 'none';
-        
+        ghostTaskElement.style.willChange = 'transform';
+        ghostTaskElement.style.opacity = '0'; // Hidden — only cell outline is shown
+
         // Use the found element (root)
         const sourceEl = e.target.closest('.task') || e.target;
-        
+
         ghostTaskElement.style.top = sourceEl.style.top;
         ghostTaskElement.style.left = sourceEl.style.left;
         ghostTaskElement.style.width = sourceEl.style.width;
@@ -351,16 +361,21 @@
         dragOutlineElement.style.position = 'absolute';
         dragOutlineElement.style.zIndex = '5';
         dragOutlineElement.style.pointerEvents = 'none';
+        dragOutlineElement.style.willChange = 'transform';
         dragOutlineElement.style.width = `${DAY_COLUMN_WIDTH}px`;
         dragOutlineElement.style.height = `${ROW_HEIGHT}px`;
         dragOutlineElement.style.outline = '2px dashed #0ea5e9';
         dragOutlineElement.style.backgroundColor = 'rgba(224, 242, 254, 0.5)';
         dragOutlineElement.style.boxSizing = 'border-box';
+        dragOutlineElement.style.boxSizing = 'border-box';
         // Initial position matching task
         const initDayIndex = Math.floor(parseFloat(sourceEl.style.left) / DAY_COLUMN_WIDTH);
         const lineIndex = lines.findIndex(l => l.id === task.lineId);
-        dragOutlineElement.style.left = `${initDayIndex * DAY_COLUMN_WIDTH}px`;
-        dragOutlineElement.style.top = `${lineIndex * ROW_HEIGHT}px`;
+        
+        // GPU Acceleration: Use transform instead of left/top
+        dragOutlineElement.style.left = '0';
+        dragOutlineElement.style.top = '0';
+        dragOutlineElement.style.transform = `translate3d(${initDayIndex * DAY_COLUMN_WIDTH}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
 
         // Append both to grid
         const grid = document.getElementById('calendar-grid');
@@ -374,7 +389,9 @@
         ghostTaskElement = document.createElement('div');
         ghostTaskElement.id = 'ghost-task';
         ghostTaskElement.style.pointerEvents = 'none';
-        
+        ghostTaskElement.style.willChange = 'transform';
+        ghostTaskElement.style.opacity = '0'; // Hidden — only cell outline is shown
+
         // Match standard task styling for unplanned ghost
         ghostTaskElement.style.position = 'absolute';
         ghostTaskElement.style.backgroundColor = 'rgba(59, 130, 246, 0.5)'; // blue-500 with opacity
@@ -382,8 +399,11 @@
         ghostTaskElement.style.borderRadius = '0.375rem'; // rounded-md
         
         ghostTaskElement.style.width = width;
-        ghostTaskElement.style.top = top;
-        ghostTaskElement.style.left = left;
+        ghostTaskElement.style.width = width;
+        // GPU Acceleration
+        ghostTaskElement.style.left = '0';
+        ghostTaskElement.style.top = '0';
+        ghostTaskElement.style.transform = `translate3d(${left}, ${top}, 0)`;
         const height = ROW_HEIGHT - FOOTER_HEIGHT - 10; // Match task height calculation
         ghostTaskElement.style.height = `${height}px`;
         ghostTaskElement.classList.add('valid');
@@ -407,9 +427,12 @@
 
     function handleDragOver(e) {
         e.preventDefault();
-        const targetCell = e.target.closest('.grid-cell');
 
-        // --- UNPLANNED TASK GHOST CREATION ---
+        // Capture mouse coords synchronously (event object may be recycled)
+        lastDragClientX = e.clientX;
+        lastDragClientY = e.clientY;
+
+        // --- UNPLANNED TASK GHOST CREATION (one-time, must be synchronous) ---
         if (!draggedTaskId && draggedUnplannedTask && !ghostTaskElement) {
              const estimatedWidth = (draggedUnplannedTask.total_days || 1) * DAY_COLUMN_WIDTH;
              if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
@@ -419,11 +442,26 @@
              createGhostTask(`${estimatedWidth}px`, `${relY}px`, `${relX}px`);
         }
 
-        if (!targetCell || !ghostTaskElement) return;
+        // Throttle all visual updates to one per animation frame
+        if (dragOverRAF) return;
+        dragOverRAF = requestAnimationFrame(processDragOver);
+    }
 
-        // Get line info from the cell under the mouse
-        const newLineId = targetCell.dataset.lineId;
-        const isBlocked = targetCell.dataset.isBlocked === 'true';
+    function processDragOver() {
+        dragOverRAF = null;
+
+        if (!ghostTaskElement) return;
+
+        if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
+        const gridRect = cachedGridRect || document.getElementById('calendar-grid').getBoundingClientRect();
+        if (!cachedGridRect) cachedGridRect = gridRect;
+
+        const relY = lastDragClientY - gridRect.top;
+        const lineIndex = Math.floor(relY / ROW_HEIGHT);
+
+        if (lineIndex < 0 || lineIndex >= lines.length) return;
+
+        const newLineId = lines[lineIndex].id;
 
         let activeTaskId = draggedTaskId;
         let durationMs = draggedTaskDurationMs;
@@ -436,67 +474,74 @@
              }
         }
 
-        // Use cached grid rect (avoids forced layout reflow on every dragover)
-        if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
-        if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
-        const mouseX = e.clientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
+        const mouseX = lastDragClientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
         const taskLeftPixel = mouseX - taskOffsetLeft;
 
-        // Calculate which date/time this pixel position corresponds to
         const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
         const dayIndex = Math.floor(dayIndexFloat);
-        const dayFraction = dayIndexFloat - dayIndex;
 
         if (dayIndex < 0 || dayIndex >= calendarDays.length) {
             ghostTaskElement.classList.remove('valid');
             ghostTaskElement.classList.add('invalid');
-            e.dataTransfer.dropEffect = 'none';
             if (dragOutlineElement) dragOutlineElement.style.display = 'none';
             return;
         }
 
-        // --- FAST PATH: Position ghost + outline with pure style updates (same paint frame) ---
-        const lineIndex = lines.findIndex(l => l.id === newLineId);
+        // --- POSITION ghost + outline (runs every frame for smooth movement) ---
         const newTop = (lineIndex * ROW_HEIGHT) + 10;
-
-        // Position ghost (pixel-precise, updates every frame)
         const durationDays = durationMs / (1000 * 60 * 60 * 24);
         const newWidth = durationDays * DAY_COLUMN_WIDTH;
-        ghostTaskElement.style.left = `${taskLeftPixel}px`;
-        ghostTaskElement.style.width = `${newWidth}px`;
-        ghostTaskElement.style.top = `${newTop}px`;
 
-        // Position outline overlay (snaps to cell grid, same style update as ghost — zero lag)
+        ghostTaskElement.style.width = `${newWidth}px`;
+        ghostTaskElement.style.transform = `translate3d(${taskLeftPixel}px, ${newTop}px, 0)`;
+
         if (dragOutlineElement) {
-            dragOutlineElement.style.left = `${dayIndex * DAY_COLUMN_WIDTH}px`;
-            dragOutlineElement.style.top = `${lineIndex * ROW_HEIGHT}px`;
+            dragOutlineElement.style.transform = `translate3d(${dayIndex * DAY_COLUMN_WIDTH}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
             dragOutlineElement.style.display = '';
         }
 
-        // --- VALIDATION (runs after positioning so visuals are never delayed) ---
-        const leftEdgeDay = calendarDays[dayIndex];
-        const baseDate = new Date(leftEdgeDay.date);
-        const workHoursForDay = getLineWorkHours(baseDate, newLineId);
-        const isLeftEdgeBlocked = leftEdgeDay.isBlocked || workHoursForDay === 0;
+        // --- VALIDATION: only re-run when hovering a different cell ---
+        if (dayIndex !== lastValidatedDayIndex || lineIndex !== lastValidatedLineIndex) {
+            lastValidatedDayIndex = dayIndex;
+            lastValidatedLineIndex = lineIndex;
 
-        const minutesIntoDay = dayFraction * 24 * 60;
-        const newStartDate = new Date(baseDate.getTime() + minutesIntoDay * 60 * 1000);
-        const newEndDate = new Date(newStartDate.getTime() + durationMs);
-        const hasOverlap = isOverlapping(activeTaskId, newLineId, newStartDate, newEndDate);
+            const leftEdgeDay = calendarDays[dayIndex];
+            const isWeekendStart = leftEdgeDay.dayOfWeek === 5 || leftEdgeDay.dayOfWeek === 6;
+            const isLeftEdgeBlocked = isWeekendStart || leftEdgeDay.isBlocked;
 
-        if (isLeftEdgeBlocked || hasOverlap) {
-            ghostTaskElement.classList.remove('valid');
-            ghostTaskElement.classList.add('invalid');
-            e.dataTransfer.dropEffect = 'none';
-        } else {
-            ghostTaskElement.classList.remove('invalid');
-            ghostTaskElement.classList.add('valid');
-            e.dataTransfer.dropEffect = 'move';
+            const dayFraction = dayIndexFloat - dayIndex;
+            const minutesIntoDay = dayFraction * 24 * 60;
+            const newStartDate = new Date(leftEdgeDay.date.getTime() + minutesIntoDay * 60 * 1000);
+            const newEndDate = new Date(newStartDate.getTime() + durationMs);
+
+            const hasOverlap = isOverlapping(activeTaskId, newLineId, newStartDate, newEndDate);
+
+            if (isLeftEdgeBlocked || hasOverlap) {
+                ghostTaskElement.classList.remove('valid');
+                ghostTaskElement.classList.add('invalid');
+                if (dragOutlineElement) {
+                    dragOutlineElement.style.outline = '2px dashed #ef4444';
+                    dragOutlineElement.style.backgroundColor = 'rgba(254, 226, 226, 0.5)';
+                }
+            } else {
+                ghostTaskElement.classList.remove('invalid');
+                ghostTaskElement.classList.add('valid');
+                if (dragOutlineElement) {
+                    dragOutlineElement.style.outline = '2px dashed #0ea5e9';
+                    dragOutlineElement.style.backgroundColor = 'rgba(224, 242, 254, 0.5)';
+                }
+            }
         }
     }
 
     function handleDragEnd(e) {
         console.log('--- handleDragEnd ---');
+        // Cancel any pending RAF to prevent stale updates
+        if (dragOverRAF) {
+            cancelAnimationFrame(dragOverRAF);
+            dragOverRAF = null;
+        }
+
         if (ghostTaskElement) {
             ghostTaskElement.remove();
             ghostTaskElement = null;
@@ -505,16 +550,18 @@
             dragOutlineElement.remove();
             dragOutlineElement = null;
         }
-        
+
         // Re-enable pointer-events on tasks
         isDragging = false;
-        
+
         draggedTaskId = null;
         originalLineId = null;
         draggedTaskOffsetLeft = 0;
         draggedTaskDurationMs = 0;
         cachedGridRect = null;
         cachedCalendarBody = null;
+        lastValidatedDayIndex = -1;
+        lastValidatedLineIndex = -1;
     }
 
     function handleDragLeave(e) {
@@ -714,6 +761,12 @@
         }
         
         const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
+        // STRICT WEEKEND CHECK for DROP
+        if (day && (day.dayOfWeek === 5 || day.dayOfWeek === 6)) {
+             console.warn("Cannot drop on a weekend (Friday/Saturday)!");
+             return;
+        }
+
         const workHours = getLineWorkHours(new Date(dateStr), newLineId);
 
         if (!day || workHours === 0) {
@@ -986,13 +1039,14 @@
     }
 
     function addDragDropListeners() {
-            // Re-attach listeners to NEW grid cells
-            const cells = document.querySelectorAll('.grid-cell');
-            cells.forEach(cell => {
-                cell.addEventListener('dragover', handleDragOver);
-                cell.addEventListener('dragleave', handleDragLeave);
-                cell.addEventListener('drop', handleDrop);
-            });
+            // Event delegation: single listener on grid parent instead of per-cell (avoids 1000+ listeners)
+            if (gridListenersAttached) return;
+            const grid = document.getElementById('calendar-grid');
+            if (!grid) return;
+            grid.addEventListener('dragover', handleDragOver);
+            grid.addEventListener('dragleave', handleDragLeave);
+            grid.addEventListener('drop', handleDrop);
+            gridListenersAttached = true;
     }
 
     // Effect to re-render when dependencies change
