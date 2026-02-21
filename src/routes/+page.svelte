@@ -622,7 +622,7 @@
                                     <td class="px-4 py-2 text-center text-gray-400">-</td>
                                     <td class="px-4 py-2 text-gray-400 italic">Order #{i + 1}</td>
                                     <td class="px-4 py-2 text-gray-400 italic">Style #{i + 1}</td>
-                                    <td class="px-4 py-2 text-right text-gray-400">0</td>
+                                    <td class="px-4 py-2 text-right text-gray-400">{(i + 1) * 1000}</td>
                                 </tr>
                             {/each}
                         </tbody>
