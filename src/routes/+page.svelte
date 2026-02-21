@@ -103,6 +103,16 @@
                 }
             ];
         
+            function getMockDate(offsetDays) {
+                const now = new Date();
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+                d.setDate(d.getDate() + offsetDays);
+                if (d.getDay() === 6) d.setDate(d.getDate() + 2); // Saturday -> Monday
+                if (d.getDay() === 0) d.setDate(d.getDate() + 1); // Sunday -> Monday
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00:00`;
+            }
+
             const MOCK_TASKS = [
                 {
                     id: 'task-101',
@@ -110,8 +120,8 @@
                     orderId: 'PO-4567',
                     style: 'T-Shirt (Red)',
                     quantity: 5000,
-                    start: '2026-02-16T00:00:00',
-                    end: '2026-02-22T00:00:00',
+                    start: getMockDate(0),
+                    end: getMockDate(8),
                     total_days: 8,
                     total_working_days: 6,
                     completed_days: 3,
@@ -127,8 +137,8 @@
                     orderId: 'PO-4568',
                     style: 'Polo (Blue)',
                     quantity: 3000,
-                    start: '2026-02-16T00:00:00',
-                    end: '2026-02-22T00:00:00',
+                    start: getMockDate(4),
+                    end: getMockDate(16),
                     total_days: 16,
                     total_working_days: 12,
                     completed_days: 5,
