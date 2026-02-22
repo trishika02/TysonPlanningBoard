@@ -23,6 +23,7 @@
     // Internal State
     let calendarDays = $state([]);
     let workHourDataList = []; // Plain array, no reactivity needed
+    let workHourMap = new Map(); // Fast lookup cache
     let currentVisibleMonth = $state(''); // Track current visible month based on scroll
     
     // Constants - Calendar starts on today and shows 60 days forward
@@ -96,27 +97,24 @@
 // On this nav bar thare is a search field. I want to search by order id and style id and if the search is found, then it should show as drop down button of the search input filed and if I click on the search result, then
     
 
-    function getLineWorkHours(date, lineId) {
+    function getLineWorkHours(date, lineId, isBlocked = null) {
         // 1. Check if it's a blocked day (weekend/holiday)
         const dateStr = formatDate(date, 'YYYY-MM-DD');
-        const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
+        if (isBlocked === true) return 0;
         
-        if (day && day.isBlocked) return 0;
+        if (isBlocked === null) {
+            const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
+            if (day && day.isBlocked) return 0;
+        }
 
-        // Use fetched work hour data (already deeply cloned to strip proxies)
-        const dataSource = workHourDataList.length > 0 ? workHourDataList : [];
-        
-        const filtr_for_line = dataSource.filter(d => d.Line === lineId);
-        
         // Convert date format from YYYY-MM-DD to DD-MM-YYYY for API data
         let date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
         
-        const workHourData = filtr_for_line.find(d => d.Date === date_)
+        const workHourData = workHourMap.get(`${lineId}_${date_}`);
         
         if (workHourData) {
-            return workHourData?.WorkHour || 0;
-        }
-        else {
+            return workHourData.WorkHour || 0;
+        } else {
             // No API data for this line/date — treat as a working day (default 10h)
             return 10;
         }
@@ -379,8 +377,6 @@
         // before we modify the element's pointer-events.
         setTimeout(() => {
             isDragging = true;
-            console.log('--- Drag Start Initiated ---');
-            console.log('Dragged Task ID:', draggedTaskId);
         }, 0);
 
         if (ghostTaskElement) ghostTaskElement.remove();
@@ -545,8 +541,10 @@
         const durationDays = durationMs / (1000 * 60 * 60 * 24);
         const newWidth = durationDays * DAY_COLUMN_WIDTH;
 
+        // Clamp ghost left edge to 0 so it never renders off-screen and always aligns with where the task will land
+        const clampedTaskLeftPixel = Math.max(0, taskLeftPixel);
         ghostTaskElement.style.width = `${newWidth}px`;
-        ghostTaskElement.style.transform = `translate3d(${taskLeftPixel}px, ${newTop}px, 0)`;
+        ghostTaskElement.style.transform = `translate3d(${clampedTaskLeftPixel}px, ${newTop}px, 0)`;
 
         if (dragOutlineElement) {
             dragOutlineElement.style.transform = `translate3d(${dayIndex * DAY_COLUMN_WIDTH}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
@@ -589,7 +587,6 @@
     }
 
     function handleDragEnd(e) {
-        console.log('--- handleDragEnd ---');
         // Cancel any pending RAF to prevent stale updates
         if (dragOverRAF) {
             cancelAnimationFrame(dragOverRAF);
@@ -708,12 +705,6 @@
             originalTask.completed_quantity = originalTask.quantity;
         }
 
-        console.log('--- SPLIT TASK DEBUG ---');
-        console.log('Original Task Start:', originalTask.start);
-        console.log('Original Task End:', originalTask.end);
-        console.log('New Task Start:', newTask.start);
-        console.log('New Task End:', newTask.end);
-        console.log('------------------------');
 
         // Add new task to tasks array
         tasks.push(newTask);
@@ -780,23 +771,12 @@
 
     function handleDrop(e) {
         e.preventDefault();
-        
-        const targetCell = e.target.closest('.grid-cell');
-        if (!targetCell) return;
-
-        targetCell.classList.remove('drag-over');
-        targetCell.classList.remove('drag-over-invalid');
-
-        const newLineId = targetCell.dataset.lineId;
-        const dateStr = targetCell.dataset.date;
-        const isBlocked = targetCell.dataset.isBlocked === 'true';
 
         let durationMs = 0;
         let taskOffsetLeft = 0;
         let droppedTaskId = null;
 
         try {
-             // Try standard drag data first
              const rawData = e.dataTransfer.getData('text/plain');
              if (rawData) {
                 const data = JSON.parse(rawData);
@@ -806,63 +786,57 @@
              }
         } catch (err) {}
 
-        // Fallback or override if it's an unplanned task
         if (!droppedTaskId && draggedUnplannedTask) {
-             console.log('Using draggedUnplannedTask for drop:', draggedUnplannedTask);
              droppedTaskId = draggedUnplannedTask.id;
              durationMs = (draggedUnplannedTask.total_days || 1) * 24 * 60 * 60 * 1000;
         }
 
-        console.log('handleDrop: droppedTaskId:', droppedTaskId, 'draggedUnplannedTask:', draggedUnplannedTask);
+        // Use pixel-based calculation (same as processDragOver) so the drop position
+        // always matches the ghost's left edge — not the mouse position.
+        if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+        if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
 
-        if (isBlocked) {
-            console.warn("Cannot drop on a blocked day!");
-            return;
-        }
-        
-        const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
+        const mouseX = e.clientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
+        const mouseY = e.clientY - cachedGridRect.top;
 
-        const workHours = getLineWorkHours(new Date(dateStr), newLineId);
+        // Determine line from Y
+        const lineIndex = Math.floor(mouseY / ROW_HEIGHT);
+        if (lineIndex < 0 || lineIndex >= lines.length) { handleDragEnd(); return; }
+        const newLineId = lines[lineIndex].id;
 
-        if (!day || workHours === 0) {
-            console.warn("Cannot drop on non-working day.");
-            return;
-        }
-
-        // Calculate task position based on mouse position minus the grab offset.
-        // Use calendarBody.getBoundingClientRect().left (stable, not affected by scrollLeft)
-        // so scroll offset isn't double-counted.
-        const calendarBody = document.getElementById('calendar-body');
-        const mouseX = e.clientX - calendarBody.getBoundingClientRect().left + calendarBody.scrollLeft;
+        // Determine day from task left-edge pixel (not mouse pixel)
         const taskLeftPixel = mouseX - taskOffsetLeft;
-
-        // Calculate which date/time this pixel position corresponds to.
-        // Clamp dayIndex to >= 0 so dropping at the very left edge of day 0 works.
         const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
         const dayIndex = Math.max(0, Math.floor(dayIndexFloat));
-        // When clamped, use fraction 0 (start of day) instead of a negative value.
         const dayFraction = dayIndex === 0 && dayIndexFloat < 0 ? 0 : (dayIndexFloat - Math.floor(dayIndexFloat));
 
         if (dayIndex >= calendarDays.length) {
             console.warn("Drop position out of calendar bounds");
+            handleDragEnd();
             return;
         }
 
-        const baseDate = new Date(calendarDays[dayIndex].date);
+        const day = calendarDays[dayIndex];
+
+        // Validate against the task's left-edge day (consistent with ghost validation)
+        if (day.isBlocked) {
+            console.warn("Cannot drop on a blocked day!");
+            handleDragEnd();
+            return;
+        }
+
+        const workHours = getLineWorkHours(day.date, newLineId, day.isBlocked);
+        if (workHours === 0) {
+            console.warn("Cannot drop on non-working day.");
+            handleDragEnd();
+            return;
+        }
+
+        const baseDate = new Date(day.date);
 
         // Calculate time within the day based on the fraction
         const minutesIntoDay = dayFraction * 24 * 60; // Total minutes into the day
         const newStartDate = new Date(baseDate.getTime() + minutesIntoDay * 60 * 1000);
-
-        console.log('=== DROP DATE DEBUG ===');
-        console.log('dateStr from cell:', dateStr);
-        console.log('Mouse X:', mouseX);
-        console.log('Task Offset Left:', taskOffsetLeft);
-        console.log('Task Left Pixel:', taskLeftPixel);
-        console.log('Day Index:', dayIndex, 'Day Fraction:', dayFraction);
-        console.log('newStartDate constructed:', newStartDate.toISOString());
-        console.log('newStartDate local:', newStartDate.toString());
-        console.log('======================');
 
         // Recalculate timeline using production system logic if function is available
         let newEndDate;
@@ -873,16 +847,13 @@
             if (task) {
                 recalculatedData = recalculateTask(task, newStartDate, newLineId);
                 newEndDate = new Date(recalculatedData.end);
-                
-                // Console log the strip's timeline
-                console.log('=== STRIP TIMELINE ON DROP ===');
-                console.log('Strip ID:', task.id);
-                console.log('Line ID:', newLineId);
-                console.log('Start Date:', recalculatedData.start);
-                console.log('End Date:', recalculatedData.end);
-                console.log('Total Days:', recalculatedData.total_days);
-                console.log('Timeline:', recalculatedData.timeline);
-                console.log('==============================');
+
+                console.log('[Drop Timeline] task:', droppedTaskId);
+                console.log('[Drop Timeline] start:', recalculatedData.start ?? newStartDate.toISOString());
+                console.log('[Drop Timeline] end:', recalculatedData.end);
+                console.log('[Drop Timeline] total_days:', recalculatedData.total_days);
+                console.log('[Drop Timeline] timeline:', recalculatedData.timeline);
+
             } else {
                 // Fallback to simple calculation
                 newEndDate = new Date(newStartDate.getTime() + durationMs);
@@ -892,10 +863,6 @@
             newEndDate = new Date(newStartDate.getTime() + durationMs);
         }
 
-        if (isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate)) {
-            console.warn("DROP REJECTED: Task would overlap with another task.");
-            return;
-        }
 
         if (newLineId && droppedTaskId) {
             const taskIndex = tasks.findIndex(t => t.id === droppedTaskId);
@@ -939,12 +906,9 @@
             ghostTaskElement = null;
         }
 
-        console.log('MOCK_TASKS after drop:', JSON.parse(JSON.stringify(tasks)));
     }
 
     function renderBoard() {
-        console.log("Rendering board (background only)...");
-        
         const calendarDates = document.getElementById('calendar-dates');
         const calendarGrid = document.getElementById('calendar-grid');
 
@@ -982,8 +946,27 @@
             const mm = String(date.getMonth() + 1).padStart(2, '0');
             const yyyy = date.getFullYear();
             const dateKeyDDMMYYYY = `${dd}-${mm}-${yyyy}`;
-            const dayRecords = workHourDataList.filter(d => d.Date === dateKeyDDMMYYYY);
-            const isOffDay = dayRecords.length > 0 ? dayRecords.every(d => d.WorkHour === 0) : false;
+            
+            let isOffDay = false;
+            if (workHourMap.size > 0 && lines.length > 0) {
+                let allZero = true;
+                let hasAnyData = false;
+                for (const line of lines) {
+                    const hd = workHourMap.get(`${line.id}_${dateKeyDDMMYYYY}`);
+                    if (hd) {
+                        hasAnyData = true;
+                        if (hd.WorkHour > 0) {
+                            allZero = false;
+                            break;
+                        }
+                    } else {
+                        // Default is 10h if no data, so not all zero building
+                        allZero = false;
+                        break;
+                    }
+                }
+                isOffDay = hasAnyData && allZero;
+            }
 
             const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
             const isBlocked = isOffDay || isHoliday;
@@ -1043,7 +1026,7 @@
 
 
                     
-                    const workHours = getLineWorkHours(day.date, line.id);
+                    const workHours = getLineWorkHours(day.date, line.id, day.isBlocked);
                     // Determine colors
                     let bgClass = day.isBlocked ? 'bg-gray-100' : 'bg-white';
                     
@@ -1133,7 +1116,9 @@
         if (apiWorkHourData && apiWorkHourData.length > 0) {
             // Deep clone to strip all Svelte 5 reactive proxies from objects
             workHourDataList = JSON.parse(JSON.stringify(apiWorkHourData));
-            console.log('Work hour data loaded:', workHourDataList.length, 'records');
+            workHourDataList.forEach(d => {
+                workHourMap.set(`${d.Line}_${d.Date}`, d);
+            });
         }
         
         renderBoard();
