@@ -197,6 +197,52 @@
     }
 
 
+    // Returns segments (left offset relative to task start, width) for any blocked days the task crosses.
+    // Covers both weekends AND holidays (isBlocked = isWeekend || isHoliday).
+    function getHolidaySegments(task) {
+        const taskStart = new Date(task.start);
+        const taskEnd = new Date(task.end);
+        const lineIndex = lines.findIndex(l => l.id === task.lineId);
+        if (lineIndex === -1) return [];
+
+        const taskStartPixel = getPixelOffsetForDate(taskStart, task.lineId);
+        const segments = [];
+
+        for (const day of calendarDays) {
+            // Match any blocked day (weekend OR holiday)
+            if (!day.isBlocked) continue;
+
+            // Check if the holiday day overlaps with the task range
+            const dayStart = new Date(day.date);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(dayStart);
+            dayEnd.setDate(dayEnd.getDate() + 1);
+
+            if (dayEnd <= taskStart || dayStart >= taskEnd) continue;
+
+            // Compute the column's absolute pixel position
+            const dayPixel = getPixelOffsetForDate(dayStart, task.lineId);
+            const leftRelToTask = dayPixel - taskStartPixel;
+
+            // Clamp to the task's own width bounds
+            const taskStartPixel2 = getPixelOffsetForDate(taskStart, task.lineId);
+            const taskEndPixel = getPixelOffsetForDate(taskEnd, task.lineId);
+            const taskWidth = taskEndPixel - taskStartPixel2;
+
+            const segLeft = Math.max(0, leftRelToTask);
+            const segRight = Math.min(taskWidth, leftRelToTask + DAY_COLUMN_WIDTH);
+            if (segRight <= segLeft) continue;
+
+            segments.push({
+                left: segLeft,
+                width: segRight - segLeft,
+                top: (lineIndex * ROW_HEIGHT) + 2,
+                height: (ROW_HEIGHT * 0.7) - 4,
+                taskLeftPixel: taskStartPixel
+            });
+        }
+        return segments;
+    }
 
     function calculateNewEndDate(newStartDate, workDurationMinutes, lineId) {
         let minutesToDistribute = workDurationMinutes;
@@ -1202,9 +1248,11 @@
                     {@const isDimmed = showMergeModal && !isCandidate && !isSource}
                     
                     {#if getTaskStyle(task)}
+                        {@const taskStyle = getTaskStyle(task)}
+                        {@const holidaySegs = getHolidaySegments(task)}
                         <Task 
                             {task}
-                            style={getTaskStyle(task)}
+                            style={taskStyle}
                             isMergeCandidate={isCandidate}
                             isDimmed={isDimmed}
                             isBoardDragging={isDragging}
@@ -1216,6 +1264,30 @@
                             onContextMenu={(e, task) => handleTaskContextMenu(e, task)}
                             {formatDate}
                         />
+                        <!-- Holiday stripe overlays (one per holiday day crossing this task) -->
+                        {#each holidaySegs as seg}
+                            <div
+                                class="absolute pointer-events-none"
+                                style="
+                                    left: {seg.taskLeftPixel + seg.left}px;
+                                    top: {seg.top}px;
+                                    width: {seg.width}px;
+                                    height: {seg.height}px;
+                                    z-index: 12;
+                                    background: repeating-linear-gradient(
+                                        45deg,
+                                        rgba(220,38,38,0.45) 0px,
+                                        rgba(220,38,38,0.45) 4px,
+                                        rgba(255,255,255,0.15) 4px,
+                                        rgba(255,255,255,0.15) 10px
+                                    );
+                                    border-left: 2px solid rgba(220,38,38,0.8);
+                                    border-right: 2px solid rgba(220,38,38,0.8);
+                                    border-radius: 0;
+                                    box-sizing: border-box;
+                                "
+                            ></div>
+                        {/each}
                     {/if}
                 {/each}
             </div>
