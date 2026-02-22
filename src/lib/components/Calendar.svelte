@@ -117,7 +117,8 @@
             return workHourData?.WorkHour || 0;
         }
         else {
-            return getStandardWorkHours(date.getDay());
+            // No API data for this line/date — treat as a working day (default 10h)
+            return 10;
         }
     }
 
@@ -341,17 +342,22 @@
 
         ghostTaskElement = document.createElement('div');
         ghostTaskElement.id = 'ghost-task';
+        ghostTaskElement.style.position = 'absolute';
+        ghostTaskElement.style.left = '0';
+        ghostTaskElement.style.top = '0';
         ghostTaskElement.style.pointerEvents = 'none';
         ghostTaskElement.style.willChange = 'transform';
-        ghostTaskElement.style.opacity = '0'; // Hidden — only cell outline is shown
+        ghostTaskElement.style.opacity = '0.5';
+        ghostTaskElement.style.backgroundColor = '#60a5fa'; // blue-400 — matches task colour
+        ghostTaskElement.style.border = '2px dashed #1d4ed8'; // blue-700
+        ghostTaskElement.style.borderRadius = '0.25rem';
+        ghostTaskElement.style.zIndex = '20';
 
         // Use the found element (root)
         const sourceEl = e.target.closest('.task') || e.target;
 
-        ghostTaskElement.style.top = sourceEl.style.top;
-        ghostTaskElement.style.left = sourceEl.style.left;
-        ghostTaskElement.style.width = sourceEl.style.width;
         const height = ROW_HEIGHT - FOOTER_HEIGHT - 10;
+        ghostTaskElement.style.width = sourceEl.style.width;
         ghostTaskElement.style.height = `${height}px`;
         ghostTaskElement.classList.add('valid');
 
@@ -390,12 +396,12 @@
         ghostTaskElement.id = 'ghost-task';
         ghostTaskElement.style.pointerEvents = 'none';
         ghostTaskElement.style.willChange = 'transform';
-        ghostTaskElement.style.opacity = '0'; // Hidden — only cell outline is shown
+        ghostTaskElement.style.opacity = '0.5';
 
         // Match standard task styling for unplanned ghost
         ghostTaskElement.style.position = 'absolute';
-        ghostTaskElement.style.backgroundColor = 'rgba(59, 130, 246, 0.5)'; // blue-500 with opacity
-        ghostTaskElement.style.border = '1px dashed #2563eb'; // blue-600
+        ghostTaskElement.style.backgroundColor = '#60a5fa'; // blue-400 — matches task colour
+        ghostTaskElement.style.border = '2px dashed #1d4ed8'; // blue-700
         ghostTaskElement.style.borderRadius = '0.375rem'; // rounded-md
         
         ghostTaskElement.style.width = width;
@@ -478,9 +484,10 @@
         const taskLeftPixel = mouseX - taskOffsetLeft;
 
         const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
-        const dayIndex = Math.floor(dayIndexFloat);
+        // Clamp to left edge (day 0) instead of rejecting: fixes "can't drop at first day's left edge"
+        const dayIndex = Math.max(0, Math.floor(dayIndexFloat));
 
-        if (dayIndex < 0 || dayIndex >= calendarDays.length) {
+        if (dayIndex >= calendarDays.length) {
             ghostTaskElement.classList.remove('valid');
             ghostTaskElement.classList.add('invalid');
             if (dragOutlineElement) dragOutlineElement.style.display = 'none';
@@ -509,7 +516,8 @@
             const isWeekendStart = leftEdgeDay.dayOfWeek === 5 || leftEdgeDay.dayOfWeek === 6;
             const isLeftEdgeBlocked = isWeekendStart || leftEdgeDay.isBlocked;
 
-            const dayFraction = dayIndexFloat - dayIndex;
+            // dayIndexFloat may be < dayIndex when clamped; clamp fraction to [0,1)
+            const dayFraction = Math.max(0, dayIndexFloat - Math.floor(dayIndexFloat));
             const minutesIntoDay = dayFraction * 24 * 60;
             const newStartDate = new Date(leftEdgeDay.date.getTime() + minutesIntoDay * 60 * 1000);
             const newEndDate = new Date(newStartDate.getTime() + durationMs);
@@ -620,13 +628,19 @@
 
         originalTask.quantity = newOriginalQuantity;
 
-        // 2. Do NOT recalculate ORIGINAL task duration/end date (User requirement: "current task should be the same start and end day")
-        // We only updated quantity.
+        // 2. Recalculate original task timeline based on reduced quantity
+        if (recalculateTask) {
+            const startDate = new Date(originalTask.start);
+            const result = recalculateTask(originalTask, startDate, originalTask.lineId);
+            originalTask.start = result.start;
+            originalTask.end = result.end;
+            originalTask.timeline = result.timeline;
+            originalTask.total_days = result.total_days;
+        }
 
-        // 3. Create NEW task
+        // 3. Create NEW task starting after recalculated original task end
         const newTaskId = `${originalTask.id}-split-${Date.now()}`;
-        
-        // User Request: "new task sholud be start on current task end day and end day would be 2 days after the stertting day"
+
         const newTaskStart = new Date(originalTask.end);
         const newTaskEnd = new Date(newTaskStart);
         newTaskEnd.setDate(newTaskEnd.getDate() + 2);
@@ -761,11 +775,6 @@
         }
         
         const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
-        // STRICT WEEKEND CHECK for DROP
-        if (day && (day.dayOfWeek === 5 || day.dayOfWeek === 6)) {
-             console.warn("Cannot drop on a weekend (Friday/Saturday)!");
-             return;
-        }
 
         const workHours = getLineWorkHours(new Date(dateStr), newLineId);
 
@@ -774,17 +783,21 @@
             return;
         }
 
-        // Calculate task position based on mouse position minus the grab offset
-        const gridRect = document.getElementById('calendar-grid').getBoundingClientRect();
-        const mouseX = e.clientX - gridRect.left + document.getElementById('calendar-body').scrollLeft;
+        // Calculate task position based on mouse position minus the grab offset.
+        // Use calendarBody.getBoundingClientRect().left (stable, not affected by scrollLeft)
+        // so scroll offset isn't double-counted.
+        const calendarBody = document.getElementById('calendar-body');
+        const mouseX = e.clientX - calendarBody.getBoundingClientRect().left + calendarBody.scrollLeft;
         const taskLeftPixel = mouseX - taskOffsetLeft;
 
-        // Calculate which date/time this pixel position corresponds to
+        // Calculate which date/time this pixel position corresponds to.
+        // Clamp dayIndex to >= 0 so dropping at the very left edge of day 0 works.
         const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
-        const dayIndex = Math.floor(dayIndexFloat);
-        const dayFraction = dayIndexFloat - dayIndex;
+        const dayIndex = Math.max(0, Math.floor(dayIndexFloat));
+        // When clamped, use fraction 0 (start of day) instead of a negative value.
+        const dayFraction = dayIndex === 0 && dayIndexFloat < 0 ? 0 : (dayIndexFloat - Math.floor(dayIndexFloat));
 
-        if (dayIndex < 0 || dayIndex >= calendarDays.length) {
+        if (dayIndex >= calendarDays.length) {
             console.warn("Drop position out of calendar bounds");
             return;
         }
@@ -841,32 +854,32 @@
         if (newLineId && droppedTaskId) {
             const taskIndex = tasks.findIndex(t => t.id === droppedTaskId);
             if (taskIndex !== -1) {
-                // Mutate existing task with recalculated data
+                // Mutate existing task with recalculated data.
+                // Use newStartDate (not recalculatedData.start) so the task's left edge
+                // lands exactly at the ghost's left edge pixel.
                 tasks[taskIndex].lineId = newLineId;
+                tasks[taskIndex].start = newStartDate.toISOString();
                 if (recalculatedData) {
-                    tasks[taskIndex].start = recalculatedData.start;
                     tasks[taskIndex].end = recalculatedData.end;
                     tasks[taskIndex].timeline = recalculatedData.timeline;
                     tasks[taskIndex].total_days = recalculatedData.total_days;
                     tasks[taskIndex].total_working_days = recalculatedData.total_days;
                 } else {
-                    tasks[taskIndex].start = newStartDate.toISOString();
                     tasks[taskIndex].end = newEndDate.toISOString();
                 }
             } else if (draggedUnplannedTask && droppedTaskId === draggedUnplannedTask.id) {
-                // New Task with recalculated data
+                // New Task — same: use newStartDate for pixel-accurate placement.
                 const newTask = {
                     ...draggedUnplannedTask,
                     lineId: newLineId,
+                    start: newStartDate.toISOString(),
                 };
                 if (recalculatedData) {
-                    newTask.start = recalculatedData.start;
                     newTask.end = recalculatedData.end;
                     newTask.timeline = recalculatedData.timeline;
                     newTask.total_days = recalculatedData.total_days;
                     newTask.total_working_days = recalculatedData.total_days;
                 } else {
-                    newTask.start = newStartDate.toISOString();
                     newTask.end = newEndDate.toISOString();
                 }
                 tasks.push(newTask);
@@ -916,13 +929,19 @@
             const date = new Date(startDate);
             date.setDate(startDate.getDate() + i);
             const dayOfWeek = date.getDay();
-            const workHours = getStandardWorkHours(dayOfWeek); 
-            // NOTE: workHours here is just for "is it weekend?", line specific hours overrides this.
-            // But we keep it to know if it's a weekend globally.
-            const isWeekend = workHours === 0;
+
+            // Determine off-day from work hour API data (not day-of-week)
+            // A day is off when ALL line records for that date have WorkHour === 0
+            const dd = String(date.getDate()).padStart(2, '0');
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const yyyy = date.getFullYear();
+            const dateKeyDDMMYYYY = `${dd}-${mm}-${yyyy}`;
+            const dayRecords = workHourDataList.filter(d => d.Date === dateKeyDDMMYYYY);
+            const isOffDay = dayRecords.length > 0 ? dayRecords.every(d => d.WorkHour === 0) : false;
+
             const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
-            const isBlocked = isWeekend || isHoliday;
-            
+            const isBlocked = isOffDay || isHoliday;
+
             // Check if this date is today
             const todayDateStr = formatDate(today, 'YYYY-MM-DD');
             const thisDateStr = formatDate(date, 'YYYY-MM-DD');
@@ -931,8 +950,8 @@
             tempDays.push({
                 date,
                 dayOfWeek,
-                // workHours, // REMOVE THIS from global day object to avoid confusion
                 isBlocked,
+                isHoliday,
                 isToday
             });
         }
@@ -960,7 +979,7 @@
                     <span class="text-lg font-black ${day.isToday ? 'text-blue-900' : 'text-gray-900'}">
                         ${day.date.getDate()}
                     </span>
-                    ${day.isBlocked ? `<div class="text-[8px] uppercase font-bold text-red-500/70 mt-0.5">${day.isHoliday ? 'HOLIDAY' : 'WEEKEND'}</div>` : ''}
+                    ${day.isBlocked ? `<div class="text-[8px] uppercase font-bold text-red-500/70 mt-0.5">${day.isHoliday ? 'HOLIDAY' : 'HOLIDAY'}</div>` : ''}
                 </div>
             `;
             calendarDates.appendChild(dateEl);

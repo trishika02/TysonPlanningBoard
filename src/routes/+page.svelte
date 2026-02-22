@@ -5,7 +5,7 @@
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { floor_line_data } from '$lib/stores/data';
             import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData } from '$lib/api-call';
-            import { calculateStripTimeline, calculateSingleStripTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
+            import { calculateSingleStripTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
             import { onMount } from 'svelte';
             import { slide } from 'svelte/transition';
             

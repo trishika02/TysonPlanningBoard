@@ -38,3 +38,19 @@ export const getStripsWithLearningCurve = async () => {
 		return [];
 	}
 };
+
+export const getShiftDetails = async () => {
+	const url = '/api/method/asl_core.api.external.shift.get_shift_details';
+	try {
+		const response = await fetch(url);
+		if (!response.ok) {
+			console.error('Failed to fetch shift details:', response.statusText);
+			return [];
+		}
+		const data = await response.json();
+		return data?.message || [];
+	} catch (error) {
+		console.error('Error fetching shift details:', error);
+		return [];
+	}
+};
