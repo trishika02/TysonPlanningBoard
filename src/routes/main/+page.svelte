@@ -4,8 +4,8 @@
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { floor_line_data } from '$lib/stores/data';
-            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData } from '$lib/api-call';
-            import { calculateStripTimeline, calculateSingleStripTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
+            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getShiftDetails } from '$lib/api-call';
+            import { generateTimeline, calculateStripTimelines, transformStripsToTasks } from '$lib/utils/taskCalculator';
             import { onMount } from 'svelte';
             import { slide } from 'svelte/transition';
             
@@ -14,6 +14,7 @@
             let tasks = $state([]);
             let lines = $state([]);
             let workHoursData = $state([]); // Store work hours for recalculation
+            let shiftMap = $state({}); // Map of shift name → shift detail object
             let showUnplanned = $state(false); // State for toggling unplanned panel
             let showUnplanned2 = $state(false); // State for toggling second unplanned panel
             /** Dragged position for Unplanned panel (null = use default centered position) */
@@ -329,28 +330,40 @@
 
                 lines = flatRows;
                 
-                // Fetch strips data and work hours from API
-                const [stripsData, fetchedWorkHours] = await Promise.all([
+                // Fetch strips, work hours, and shift details in parallel
+                const startDateStr = today.toISOString().split('T')[0];
+                const endDateObj = new Date(today);
+                endDateObj.setDate(endDateObj.getDate() + 30);
+                const endDateStr = endDateObj.toISOString().split('T')[0];
+
+                const [stripsData, fetchedWorkHours, fetchedShifts] = await Promise.all([
                     getStripsWithLearningCurve(),
-                    getWorkHourData()
+                    getWorkHourData(startDateStr, endDateStr),
+                    getShiftDetails()
                 ]);
-                // console.log({stripsData});
-                // const stripsData = []
-                
+
                 // Store work hours for later recalculation
                 workHoursData = fetchedWorkHours || [];
-                
+
+                // Build shift lookup map: { "Day Shift": { name, startTime, ... } }
+                // Fallback to a default Day Shift if the API returns nothing
+                if (fetchedShifts && fetchedShifts.length > 0) {
+                    fetchedShifts.forEach((s) => { shiftMap[s.name] = s; });
+                } else {
+                    shiftMap = { 'Day Shift': { name: 'Day Shift', startTime: '09:00:00' } };
+                }
+
                 if (stripsData && stripsData.length > 0) {
-                    // Calculate timelines using production system logic
-                    const stripsWithTimelines = calculateStripTimeline(
+                    // Calculate timelines using the ERPNext-matching production system logic
+                    const stripsWithTimelines = calculateStripTimelines(
                         stripsData,
                         workHoursData,
-                        today
+                        shiftMap
                     );
-                    
+
                     // Transform to application task format
                     const { planned, unplanned } = transformStripsToTasks(stripsWithTimelines);
-                    
+
                     tasks = planned;
                     unplannedTasks = unplanned;
                 } else {
@@ -358,7 +371,6 @@
                     // tasks = [...MOCK_TASKS];
                     // Keep existing unplannedTasks
                 }
-                // tasks = [...MOCK_TASKS];
         
                 // Initial setup
                 setTimeout(() => {
@@ -389,37 +401,64 @@
             {draggedUnplannedTask}
             {workHoursData}
             recalculateTask={(task, newStartDate, newLineId) => {
-                // Check if we have valid work hours data
+                // FALLBACK: preserve original duration when no work hours available
                 if (!workHoursData || workHoursData.length === 0) {
-                     // FALLBACK: Preserve original duration
-                     const oldStart = new Date(task.start);
-                     const oldEnd = new Date(task.end);
-                     const durationMs = oldEnd.getTime() - oldStart.getTime();
-                     
-                     const newEnd = new Date(newStartDate.getTime() + durationMs);
-                     
-                     return {
-                         start: newStartDate.toISOString(),
-                         end: newEnd.toISOString(),
-                         timeline: task.timeline || [],
-                         total_days: task.total_days || 0
-                     };
+                    const durationMs = new Date(task.end) - new Date(task.start);
+                    const newEnd = new Date(newStartDate.getTime() + durationMs);
+                    return {
+                        start: newStartDate.toISOString(),
+                        end: newEnd.toISOString(),
+                        timeline: task.timeline || [],
+                        total_days: task.total_days || 0
+                    };
                 }
 
-                // Recalculate timeline for dropped task
+                // Filter and sort work hours for the target line
+                const lineWorkHours = workHoursData
+                    .filter((d) => d.Line === newLineId)
+                    .sort((a, b) => a.Date.localeCompare(b.Date));
+
+                if (lineWorkHours.length === 0) {
+                    // FALLBACK: no work hours for this line
+                    const durationMs = new Date(task.end) - new Date(task.start);
+                    const newEnd = new Date(newStartDate.getTime() + durationMs);
+                    return {
+                        start: newStartDate.toISOString(),
+                        end: newEnd.toISOString(),
+                        timeline: task.timeline || [],
+                        total_days: task.total_days || 0
+                    };
+                }
+
+                // Resolve shift for this line
+                const shiftName = lineWorkHours[0].Shift;
+                const shiftData = shiftMap[shiftName]
+                    ?? { name: shiftName, startTime: '09:00:00' };
+
+                // Build strip data for timeline calculation
                 const stripData = {
                     lineId: newLineId,
                     quantity: task.quantity,
                     smv: task.smv,
                     totalManpower: task.manpower,
-                    learningCurveTable: task.learningCurve
+                    learningCurveTable: task.learningCurve || [],
+                    sewingStartDate: newStartDate.toISOString()
                 };
-                const recalculated = calculateSingleStripTimeline(stripData, workHoursData, newStartDate);
+
+                const { timeline } = generateTimeline(stripData, lineWorkHours, shiftData);
+
+                const startStr = timeline.length > 0
+                    ? `${timeline[0].date} ${timeline[0].shift_start_time}`
+                    : newStartDate.toISOString();
+                const endStr = timeline.length > 0
+                    ? `${timeline[timeline.length - 1].date} ${timeline[timeline.length - 1].shift_end_time}`
+                    : newStartDate.toISOString();
+
                 return {
-                    start: recalculated.startDate,
-                    end: recalculated.endDate,
-                    timeline: recalculated.timeline,
-                    total_days: recalculated.timeline?.length || 0
+                    start: startStr,
+                    end: endStr,
+                    timeline,
+                    total_days: timeline.length
                 };
             }}
             onUnplannedDrop={handleUnplannedDrop}

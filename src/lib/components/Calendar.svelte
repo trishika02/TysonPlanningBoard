@@ -14,7 +14,7 @@
         today = new Date(),
         holidays = [],
         draggedUnplannedTask = null,
-        workHoursData = [],
+        workHoursData = $bindable([]),
         recalculateTask = null,
         onUnplannedDrop = () => {},
         onScroll = () => {}
@@ -23,11 +23,12 @@
     // Internal State
     let calendarDays = $state([]);
     let workHourDataList = []; // Plain array, no reactivity needed
+    let workHourMap = new Map(); // Fast lookup cache
     let currentVisibleMonth = $state(''); // Track current visible month based on scroll
     
-    // Constants - Calendar starts on today and shows 60 days forward
+    // Constants - Calendar starts on today and shows 30 days forward
     let daysBefore = $state(0);  // Start on today (no days before)
-    let daysAfter = $state(60);   // Show 60 days after today
+    let daysAfter = $state(30);   // Show 30 days after today
     const DAY_COLUMN_WIDTH = 140; // Wider columns for better visibility
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
@@ -35,13 +36,33 @@
     const END_HOUR = 18;
 
     // Functions to load more days
-    function loadEarlierDays() {
+    async function loadEarlierDays() {
+        const startDateObj = new Date(today);
+        startDateObj.setDate(startDateObj.getDate() - daysBefore - 30);
+        const endDateObj = new Date(today);
+        endDateObj.setDate(endDateObj.getDate() - daysBefore);
+        
         daysBefore += 30;
+
+        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"));
+        if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
+            workHoursData = [...workHoursData, ...newAPIWorkHourData];
+        }
         renderBoard();
     }
 
-    function loadLaterDays() {
+    async function loadLaterDays() {
+        const startDateObj = new Date(today);
+        startDateObj.setDate(startDateObj.getDate() + daysAfter);
+        const endDateObj = new Date(today);
+        endDateObj.setDate(endDateObj.getDate() + daysAfter + 30);
+        
         daysAfter += 30;
+
+        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"));
+        if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
+            workHoursData = [...workHoursData, ...newAPIWorkHourData];
+        }
         renderBoard();
     }
 
@@ -96,28 +117,26 @@
 // On this nav bar thare is a search field. I want to search by order id and style id and if the search is found, then it should show as drop down button of the search input filed and if I click on the search result, then
     
 
-    function getLineWorkHours(date, lineId) {
+    function getLineWorkHours(date, lineId, isBlocked = null) {
         // 1. Check if it's a blocked day (weekend/holiday)
         const dateStr = formatDate(date, 'YYYY-MM-DD');
-        const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
+        if (isBlocked === true) return 0;
         
-        if (day && day.isBlocked) return 0;
+        if (isBlocked === null) {
+            const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
+            if (day && day.isBlocked) return 0;
+        }
 
-        // Use fetched work hour data (already deeply cloned to strip proxies)
-        const dataSource = workHourDataList.length > 0 ? workHourDataList : [];
-        
-        const filtr_for_line = dataSource.filter(d => d.Line === lineId);
-        
         // Convert date format from YYYY-MM-DD to DD-MM-YYYY for API data
         let date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
         
-        const workHourData = filtr_for_line.find(d => d.Date === date_)
+        const workHourData = workHourMap.get(`${lineId}_${date_}`);
         
         if (workHourData) {
-            return workHourData?.WorkHour || 0;
-        }
-        else {
-            return getStandardWorkHours(date.getDay());
+            return workHourData.WorkHour || 0;
+        } else {
+            // No API data for this line/date — treat as a working day (default 10h)
+            return 10;
         }
     }
 
@@ -208,8 +227,9 @@
         const segments = [];
 
         for (const day of calendarDays) {
-            // Match any blocked day (weekend OR holiday)
-            if (!day.isBlocked) continue;
+            // Match any blocked day or 0 work hour day for this line
+            const workHours = getLineWorkHours(day.date, task.lineId, day.isBlocked);
+            if (!day.isBlocked && workHours > 0) continue;
 
             // Check if the holiday day overlaps with the task range
             const dayStart = new Date(day.date);
@@ -378,8 +398,6 @@
         // before we modify the element's pointer-events.
         setTimeout(() => {
             isDragging = true;
-            console.log('--- Drag Start Initiated ---');
-            console.log('Dragged Task ID:', draggedTaskId);
         }, 0);
 
         if (ghostTaskElement) ghostTaskElement.remove();
@@ -387,17 +405,22 @@
 
         ghostTaskElement = document.createElement('div');
         ghostTaskElement.id = 'ghost-task';
+        ghostTaskElement.style.position = 'absolute';
+        ghostTaskElement.style.left = '0';
+        ghostTaskElement.style.top = '0';
         ghostTaskElement.style.pointerEvents = 'none';
         ghostTaskElement.style.willChange = 'transform';
-        ghostTaskElement.style.opacity = '0'; // Hidden — only cell outline is shown
+        ghostTaskElement.style.opacity = '0.5';
+        ghostTaskElement.style.backgroundColor = '#60a5fa'; // blue-400 — matches task colour
+        ghostTaskElement.style.border = '2px dashed #1d4ed8'; // blue-700
+        ghostTaskElement.style.borderRadius = '0.25rem';
+        ghostTaskElement.style.zIndex = '20';
 
         // Use the found element (root)
         const sourceEl = e.target.closest('.task') || e.target;
 
-        ghostTaskElement.style.top = sourceEl.style.top;
-        ghostTaskElement.style.left = sourceEl.style.left;
-        ghostTaskElement.style.width = sourceEl.style.width;
         const height = ROW_HEIGHT - FOOTER_HEIGHT - 10;
+        ghostTaskElement.style.width = sourceEl.style.width;
         ghostTaskElement.style.height = `${height}px`;
         ghostTaskElement.classList.add('valid');
 
@@ -436,12 +459,12 @@
         ghostTaskElement.id = 'ghost-task';
         ghostTaskElement.style.pointerEvents = 'none';
         ghostTaskElement.style.willChange = 'transform';
-        ghostTaskElement.style.opacity = '0'; // Hidden — only cell outline is shown
+        ghostTaskElement.style.opacity = '0.5';
 
         // Match standard task styling for unplanned ghost
         ghostTaskElement.style.position = 'absolute';
-        ghostTaskElement.style.backgroundColor = 'rgba(59, 130, 246, 0.5)'; // blue-500 with opacity
-        ghostTaskElement.style.border = '1px dashed #2563eb'; // blue-600
+        ghostTaskElement.style.backgroundColor = '#60a5fa'; // blue-400 — matches task colour
+        ghostTaskElement.style.border = '2px dashed #1d4ed8'; // blue-700
         ghostTaskElement.style.borderRadius = '0.375rem'; // rounded-md
         
         ghostTaskElement.style.width = width;
@@ -524,9 +547,10 @@
         const taskLeftPixel = mouseX - taskOffsetLeft;
 
         const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
-        const dayIndex = Math.floor(dayIndexFloat);
+        // Clamp to left edge (day 0) instead of rejecting: fixes "can't drop at first day's left edge"
+        const dayIndex = Math.max(0, Math.floor(dayIndexFloat));
 
-        if (dayIndex < 0 || dayIndex >= calendarDays.length) {
+        if (dayIndex >= calendarDays.length) {
             ghostTaskElement.classList.remove('valid');
             ghostTaskElement.classList.add('invalid');
             if (dragOutlineElement) dragOutlineElement.style.display = 'none';
@@ -538,8 +562,10 @@
         const durationDays = durationMs / (1000 * 60 * 60 * 24);
         const newWidth = durationDays * DAY_COLUMN_WIDTH;
 
+        // Clamp ghost left edge to 0 so it never renders off-screen and always aligns with where the task will land
+        const clampedTaskLeftPixel = Math.max(0, taskLeftPixel);
         ghostTaskElement.style.width = `${newWidth}px`;
-        ghostTaskElement.style.transform = `translate3d(${taskLeftPixel}px, ${newTop}px, 0)`;
+        ghostTaskElement.style.transform = `translate3d(${clampedTaskLeftPixel}px, ${newTop}px, 0)`;
 
         if (dragOutlineElement) {
             dragOutlineElement.style.transform = `translate3d(${dayIndex * DAY_COLUMN_WIDTH}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
@@ -553,9 +579,11 @@
 
             const leftEdgeDay = calendarDays[dayIndex];
             const isWeekendStart = leftEdgeDay.dayOfWeek === 5 || leftEdgeDay.dayOfWeek === 6;
-            const isLeftEdgeBlocked = isWeekendStart || leftEdgeDay.isBlocked;
+            const workHours = getLineWorkHours(leftEdgeDay.date, newLineId, leftEdgeDay.isBlocked);
+            const isLeftEdgeBlocked = isWeekendStart || leftEdgeDay.isBlocked || workHours === 0;
 
-            const dayFraction = dayIndexFloat - dayIndex;
+            // dayIndexFloat may be < dayIndex when clamped; clamp fraction to [0,1)
+            const dayFraction = Math.max(0, dayIndexFloat - Math.floor(dayIndexFloat));
             const minutesIntoDay = dayFraction * 24 * 60;
             const newStartDate = new Date(leftEdgeDay.date.getTime() + minutesIntoDay * 60 * 1000);
             const newEndDate = new Date(newStartDate.getTime() + durationMs);
@@ -581,7 +609,6 @@
     }
 
     function handleDragEnd(e) {
-        console.log('--- handleDragEnd ---');
         // Cancel any pending RAF to prevent stale updates
         if (dragOverRAF) {
             cancelAnimationFrame(dragOverRAF);
@@ -666,13 +693,19 @@
 
         originalTask.quantity = newOriginalQuantity;
 
-        // 2. Do NOT recalculate ORIGINAL task duration/end date (User requirement: "current task should be the same start and end day")
-        // We only updated quantity.
+        // 2. Recalculate original task timeline based on reduced quantity
+        if (recalculateTask) {
+            const startDate = new Date(originalTask.start);
+            const result = recalculateTask(originalTask, startDate, originalTask.lineId);
+            originalTask.start = result.start;
+            originalTask.end = result.end;
+            originalTask.timeline = result.timeline;
+            originalTask.total_days = result.total_days;
+        }
 
-        // 3. Create NEW task
+        // 3. Create NEW task starting after recalculated original task end
         const newTaskId = `${originalTask.id}-split-${Date.now()}`;
-        
-        // User Request: "new task sholud be start on current task end day and end day would be 2 days after the stertting day"
+
         const newTaskStart = new Date(originalTask.end);
         const newTaskEnd = new Date(newTaskStart);
         newTaskEnd.setDate(newTaskEnd.getDate() + 2);
@@ -694,12 +727,6 @@
             originalTask.completed_quantity = originalTask.quantity;
         }
 
-        console.log('--- SPLIT TASK DEBUG ---');
-        console.log('Original Task Start:', originalTask.start);
-        console.log('Original Task End:', originalTask.end);
-        console.log('New Task Start:', newTask.start);
-        console.log('New Task End:', newTask.end);
-        console.log('------------------------');
 
         // Add new task to tasks array
         tasks.push(newTask);
@@ -766,23 +793,12 @@
 
     function handleDrop(e) {
         e.preventDefault();
-        
-        const targetCell = e.target.closest('.grid-cell');
-        if (!targetCell) return;
-
-        targetCell.classList.remove('drag-over');
-        targetCell.classList.remove('drag-over-invalid');
-
-        const newLineId = targetCell.dataset.lineId;
-        const dateStr = targetCell.dataset.date;
-        const isBlocked = targetCell.dataset.isBlocked === 'true';
 
         let durationMs = 0;
         let taskOffsetLeft = 0;
         let droppedTaskId = null;
 
         try {
-             // Try standard drag data first
              const rawData = e.dataTransfer.getData('text/plain');
              if (rawData) {
                 const data = JSON.parse(rawData);
@@ -792,64 +808,57 @@
              }
         } catch (err) {}
 
-        // Fallback or override if it's an unplanned task
         if (!droppedTaskId && draggedUnplannedTask) {
-             console.log('Using draggedUnplannedTask for drop:', draggedUnplannedTask);
              droppedTaskId = draggedUnplannedTask.id;
              durationMs = (draggedUnplannedTask.total_days || 1) * 24 * 60 * 60 * 1000;
         }
 
-        console.log('handleDrop: droppedTaskId:', droppedTaskId, 'draggedUnplannedTask:', draggedUnplannedTask);
+        // Use pixel-based calculation (same as processDragOver) so the drop position
+        // always matches the ghost's left edge — not the mouse position.
+        if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+        if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
 
-        if (isBlocked) {
-            console.warn("Cannot drop on a blocked day!");
-            return;
-        }
-        
-        const day = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateStr);
-        // STRICT WEEKEND CHECK for DROP
-        if (day && (day.dayOfWeek === 5 || day.dayOfWeek === 6)) {
-             console.warn("Cannot drop on a weekend (Friday/Saturday)!");
-             return;
-        }
+        const mouseX = e.clientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
+        const mouseY = e.clientY - cachedGridRect.top;
 
-        const workHours = getLineWorkHours(new Date(dateStr), newLineId);
+        // Determine line from Y
+        const lineIndex = Math.floor(mouseY / ROW_HEIGHT);
+        if (lineIndex < 0 || lineIndex >= lines.length) { handleDragEnd(); return; }
+        const newLineId = lines[lineIndex].id;
 
-        if (!day || workHours === 0) {
-            console.warn("Cannot drop on non-working day.");
-            return;
-        }
-
-        // Calculate task position based on mouse position minus the grab offset
-        const gridRect = document.getElementById('calendar-grid').getBoundingClientRect();
-        const mouseX = e.clientX - gridRect.left + document.getElementById('calendar-body').scrollLeft;
+        // Determine day from task left-edge pixel (not mouse pixel)
         const taskLeftPixel = mouseX - taskOffsetLeft;
-
-        // Calculate which date/time this pixel position corresponds to
         const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
-        const dayIndex = Math.floor(dayIndexFloat);
-        const dayFraction = dayIndexFloat - dayIndex;
+        const dayIndex = Math.max(0, Math.floor(dayIndexFloat));
+        const dayFraction = dayIndex === 0 && dayIndexFloat < 0 ? 0 : (dayIndexFloat - Math.floor(dayIndexFloat));
 
-        if (dayIndex < 0 || dayIndex >= calendarDays.length) {
+        if (dayIndex >= calendarDays.length) {
             console.warn("Drop position out of calendar bounds");
+            handleDragEnd();
             return;
         }
 
-        const baseDate = new Date(calendarDays[dayIndex].date);
+        const day = calendarDays[dayIndex];
+
+        // Validate against the task's left-edge day (consistent with ghost validation)
+        if (day.isBlocked) {
+            console.warn("Cannot drop on a blocked day!");
+            handleDragEnd();
+            return;
+        }
+
+        const workHours = getLineWorkHours(day.date, newLineId, day.isBlocked);
+        if (workHours === 0) {
+            console.warn("Cannot drop on non-working day.");
+            handleDragEnd();
+            return;
+        }
+
+        const baseDate = new Date(day.date);
 
         // Calculate time within the day based on the fraction
         const minutesIntoDay = dayFraction * 24 * 60; // Total minutes into the day
         const newStartDate = new Date(baseDate.getTime() + minutesIntoDay * 60 * 1000);
-
-        console.log('=== DROP DATE DEBUG ===');
-        console.log('dateStr from cell:', dateStr);
-        console.log('Mouse X:', mouseX);
-        console.log('Task Offset Left:', taskOffsetLeft);
-        console.log('Task Left Pixel:', taskLeftPixel);
-        console.log('Day Index:', dayIndex, 'Day Fraction:', dayFraction);
-        console.log('newStartDate constructed:', newStartDate.toISOString());
-        console.log('newStartDate local:', newStartDate.toString());
-        console.log('======================');
 
         // Recalculate timeline using production system logic if function is available
         let newEndDate;
@@ -860,16 +869,13 @@
             if (task) {
                 recalculatedData = recalculateTask(task, newStartDate, newLineId);
                 newEndDate = new Date(recalculatedData.end);
-                
-                // Console log the strip's timeline
-                console.log('=== STRIP TIMELINE ON DROP ===');
-                console.log('Strip ID:', task.id);
-                console.log('Line ID:', newLineId);
-                console.log('Start Date:', recalculatedData.start);
-                console.log('End Date:', recalculatedData.end);
-                console.log('Total Days:', recalculatedData.total_days);
-                console.log('Timeline:', recalculatedData.timeline);
-                console.log('==============================');
+
+                console.log('[Drop Timeline] task:', droppedTaskId);
+                console.log('[Drop Timeline] start:', recalculatedData.start ?? newStartDate.toISOString());
+                console.log('[Drop Timeline] end:', recalculatedData.end);
+                console.log('[Drop Timeline] total_days:', recalculatedData.total_days);
+                console.log('[Drop Timeline] timeline:', recalculatedData.timeline);
+
             } else {
                 // Fallback to simple calculation
                 newEndDate = new Date(newStartDate.getTime() + durationMs);
@@ -880,39 +886,40 @@
         }
 
         if (isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate)) {
-            console.warn("DROP REJECTED: Task would overlap with another task.");
+            console.warn("Cannot drop: Task overlaps with an existing task.");
+            handleDragEnd();
             return;
         }
 
         if (newLineId && droppedTaskId) {
             const taskIndex = tasks.findIndex(t => t.id === droppedTaskId);
             if (taskIndex !== -1) {
-                // Mutate existing task with recalculated data
+                // Mutate existing task with recalculated data.
+                // Use newStartDate (not recalculatedData.start) so the task's left edge
+                // lands exactly at the ghost's left edge pixel.
                 tasks[taskIndex].lineId = newLineId;
+                tasks[taskIndex].start = newStartDate.toISOString();
                 if (recalculatedData) {
-                    tasks[taskIndex].start = recalculatedData.start;
                     tasks[taskIndex].end = recalculatedData.end;
                     tasks[taskIndex].timeline = recalculatedData.timeline;
                     tasks[taskIndex].total_days = recalculatedData.total_days;
                     tasks[taskIndex].total_working_days = recalculatedData.total_days;
                 } else {
-                    tasks[taskIndex].start = newStartDate.toISOString();
                     tasks[taskIndex].end = newEndDate.toISOString();
                 }
             } else if (draggedUnplannedTask && droppedTaskId === draggedUnplannedTask.id) {
-                // New Task with recalculated data
+                // New Task — same: use newStartDate for pixel-accurate placement.
                 const newTask = {
                     ...draggedUnplannedTask,
                     lineId: newLineId,
+                    start: newStartDate.toISOString(),
                 };
                 if (recalculatedData) {
-                    newTask.start = recalculatedData.start;
                     newTask.end = recalculatedData.end;
                     newTask.timeline = recalculatedData.timeline;
                     newTask.total_days = recalculatedData.total_days;
                     newTask.total_working_days = recalculatedData.total_days;
                 } else {
-                    newTask.start = newStartDate.toISOString();
                     newTask.end = newEndDate.toISOString();
                 }
                 tasks.push(newTask);
@@ -926,12 +933,9 @@
             ghostTaskElement = null;
         }
 
-        console.log('MOCK_TASKS after drop:', JSON.parse(JSON.stringify(tasks)));
     }
 
     function renderBoard() {
-        console.log("Rendering board (background only)...");
-        
         const calendarDates = document.getElementById('calendar-dates');
         const calendarGrid = document.getElementById('calendar-grid');
 
@@ -962,13 +966,38 @@
             const date = new Date(startDate);
             date.setDate(startDate.getDate() + i);
             const dayOfWeek = date.getDay();
-            const workHours = getStandardWorkHours(dayOfWeek); 
-            // NOTE: workHours here is just for "is it weekend?", line specific hours overrides this.
-            // But we keep it to know if it's a weekend globally.
-            const isWeekend = workHours === 0;
-            const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
-            const isBlocked = isWeekend || isHoliday;
+
+            // Determine off-day from work hour API data (not day-of-week)
+            // A day is off when ALL line records for that date have WorkHour === 0
+            const dd = String(date.getDate()).padStart(2, '0');
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const yyyy = date.getFullYear();
+            const dateKeyDDMMYYYY = `${dd}-${mm}-${yyyy}`;
             
+            let isOffDay = false;
+            if (workHourMap.size > 0 && lines.length > 0) {
+                let allZero = true;
+                let hasAnyData = false;
+                for (const line of lines) {
+                    const hd = workHourMap.get(`${line.id}_${dateKeyDDMMYYYY}`);
+                    if (hd) {
+                        hasAnyData = true;
+                        if (hd.WorkHour > 0) {
+                            allZero = false;
+                            break;
+                        }
+                    } else {
+                        // Default is 10h if no data, so not all zero building
+                        allZero = false;
+                        break;
+                    }
+                }
+                isOffDay = hasAnyData && allZero;
+            }
+
+            const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
+            const isBlocked = isOffDay || isHoliday;
+
             // Check if this date is today
             const todayDateStr = formatDate(today, 'YYYY-MM-DD');
             const thisDateStr = formatDate(date, 'YYYY-MM-DD');
@@ -977,8 +1006,8 @@
             tempDays.push({
                 date,
                 dayOfWeek,
-                // workHours, // REMOVE THIS from global day object to avoid confusion
                 isBlocked,
+                isHoliday,
                 isToday
             });
         }
@@ -1006,7 +1035,7 @@
                     <span class="text-lg font-black ${day.isToday ? 'text-blue-900' : 'text-gray-900'}">
                         ${day.date.getDate()}
                     </span>
-                    ${day.isBlocked ? `<div class="text-[8px] uppercase font-bold text-red-500/70 mt-0.5">${day.isHoliday ? 'HOLIDAY' : 'WEEKEND'}</div>` : ''}
+                    ${day.isBlocked ? `<div class="text-[8px] uppercase font-bold text-red-500/70 mt-0.5">${day.isHoliday ? 'HOLIDAY' : 'HOLIDAY'}</div>` : ''}
                 </div>
             `;
             calendarDates.appendChild(dateEl);
@@ -1024,7 +1053,7 @@
 
 
                     
-                    const workHours = getLineWorkHours(day.date, line.id);
+                    const workHours = getLineWorkHours(day.date, line.id, day.isBlocked);
                     // Determine colors
                     let bgClass = day.isBlocked ? 'bg-gray-100' : 'bg-white';
                     
@@ -1035,8 +1064,11 @@
                         const percentPerHr = 100 / workHours;
                         gridLinesFaint = `repeating-linear-gradient(to right, #f0f0f0 0, #f0f0f0 1px, transparent 1px, transparent ${percentPerHr}%)`;
                         gridLinesStrong = `repeating-linear-gradient(to right, #a5b4fc 0, #a5b4fc 1px, transparent 1px, transparent ${percentPerHr}%)`;
+                    } else if (workHours === 0) {
+                         // Distinct look for 0 hours
+                         bgClass = 'bg-gray-100'; 
+                         gridLinesFaint = `repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(156, 163, 175, 0.2) 10px, rgba(156, 163, 175, 0.2) 20px)`;
                     } else {
-                         // If blocked or 0 hours, maybe distinct look?
                          bgClass = 'bg-gray-100'; 
                     }
 
@@ -1072,6 +1104,11 @@
                         label.className = "text-[9px] font-bold text-gray-500 uppercase tracking-tighter opacity-70";
                         label.innerText = `${workHours} h`;
                         hoursArea.appendChild(label);
+                    } else if (day.isBlocked || workHours === 0) {
+                        const label = document.createElement('span');
+                        label.className = "text-[10px] font-bold text-red-500/70 uppercase tracking-tighter font-extrabold";
+                        label.innerText = `HOLIDAY`;
+                        hoursArea.appendChild(label);
                     }
                     cell.appendChild(hoursArea);
 
@@ -1106,17 +1143,19 @@
         }
     });
 
-    onMount(async () => {
-        // Fetch work hour data from API
-        const apiWorkHourData = await getWorkHourData();
-     
-        
-        if (apiWorkHourData && apiWorkHourData.length > 0) {
-            // Deep clone to strip all Svelte 5 reactive proxies from objects
-            workHourDataList = JSON.parse(JSON.stringify(apiWorkHourData));
-            console.log('Work hour data loaded:', workHourDataList.length, 'records');
+    $effect(() => {
+        if (workHoursData && workHoursData.length > 0) {
+            workHourDataList = JSON.parse(JSON.stringify(workHoursData));
+            workHourDataList.forEach(d => {
+                workHourMap.set(`${d.Line}_${d.Date}`, d);
+            });
+            tick().then(() => {
+                 renderBoard();
+            });
         }
-        
+    });
+
+    onMount(() => {
         renderBoard();
     });
 
