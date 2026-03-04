@@ -29,7 +29,23 @@
     // Constants - Calendar starts on today and shows 30 days forward
     let daysBefore = $state(0);  // Start on today (no days before)
     let daysAfter = $state(30);   // Show 30 days after today
-    const DAY_COLUMN_WIDTH = 140; // Wider columns for better visibility
+    // Zoom State
+    let dayColumnWidth = $state(140); // Reactive column width (was const DAY_COLUMN_WIDTH)
+    const ZOOM_STEP = 40; // px per zoom step
+    const ZOOM_MIN = 40;  // Minimum column width (~60 days visible = ~2 months)
+    const ZOOM_MAX = 350; // Maximum column width (~4 days visible)
+
+    function zoomIn() {
+        // Larger columns = fewer days visible (min ~4 days)
+        dayColumnWidth = Math.min(ZOOM_MAX, dayColumnWidth + ZOOM_STEP);
+        tick().then(() => renderBoard());
+    }
+
+    function zoomOut() {
+        // Smaller columns = more days visible (max ~2 months = ~60 days)
+        dayColumnWidth = Math.max(ZOOM_MIN, dayColumnWidth - ZOOM_STEP);
+        tick().then(() => renderBoard());
+    }
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
     const START_HOUR = 8;
@@ -184,7 +200,7 @@
         // Convert to days (float)
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
         
-        return diffDays * DAY_COLUMN_WIDTH;
+        return diffDays * dayColumnWidth;
     }
 
     function getTaskStyle(task) {
@@ -200,7 +216,7 @@
         let endPixel = getPixelOffsetForDate(taskEnd, task.lineId);
         if (endPixel === null) {
             const lastDayIndex = calendarDays.length - 1;
-            endPixel = (lastDayIndex * DAY_COLUMN_WIDTH) + DAY_COLUMN_WIDTH;
+            endPixel = (lastDayIndex * dayColumnWidth) + dayColumnWidth;
         }
 
         const width = endPixel - startPixel;
@@ -249,7 +265,7 @@
             const taskWidth = taskEndPixel - taskStartPixel2;
 
             const segLeft = Math.max(0, leftRelToTask);
-            const segRight = Math.min(taskWidth, leftRelToTask + DAY_COLUMN_WIDTH);
+            const segRight = Math.min(taskWidth, leftRelToTask + dayColumnWidth);
             if (segRight <= segLeft) continue;
 
             segments.push({
@@ -431,20 +447,20 @@
         dragOutlineElement.style.zIndex = '5';
         dragOutlineElement.style.pointerEvents = 'none';
         dragOutlineElement.style.willChange = 'transform';
-        dragOutlineElement.style.width = `${DAY_COLUMN_WIDTH}px`;
+        dragOutlineElement.style.width = `${dayColumnWidth}px`;
         dragOutlineElement.style.height = `${ROW_HEIGHT}px`;
         dragOutlineElement.style.outline = '2px dashed #0ea5e9';
         dragOutlineElement.style.backgroundColor = 'rgba(224, 242, 254, 0.5)';
         dragOutlineElement.style.boxSizing = 'border-box';
         dragOutlineElement.style.boxSizing = 'border-box';
         // Initial position matching task
-        const initDayIndex = Math.floor(parseFloat(sourceEl.style.left) / DAY_COLUMN_WIDTH);
+        const initDayIndex = Math.floor(parseFloat(sourceEl.style.left) / dayColumnWidth);
         const lineIndex = lines.findIndex(l => l.id === task.lineId);
         
         // GPU Acceleration: Use transform instead of left/top
         dragOutlineElement.style.left = '0';
         dragOutlineElement.style.top = '0';
-        dragOutlineElement.style.transform = `translate3d(${initDayIndex * DAY_COLUMN_WIDTH}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
+        dragOutlineElement.style.transform = `translate3d(${initDayIndex * dayColumnWidth}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
 
         // Append both to grid
         const grid = document.getElementById('calendar-grid');
@@ -503,7 +519,7 @@
 
         // --- UNPLANNED TASK GHOST CREATION (one-time, must be synchronous) ---
         if (!draggedTaskId && draggedUnplannedTask && !ghostTaskElement) {
-             const estimatedWidth = (draggedUnplannedTask.total_days || 1) * DAY_COLUMN_WIDTH;
+             const estimatedWidth = (draggedUnplannedTask.total_days || 1) * dayColumnWidth;
              if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
              if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
              const relX = e.clientX - cachedGridRect.left;
@@ -546,7 +562,7 @@
         const mouseX = lastDragClientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
         const taskLeftPixel = mouseX - taskOffsetLeft;
 
-        const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
+        const dayIndexFloat = taskLeftPixel / dayColumnWidth;
         // Clamp to left edge (day 0) instead of rejecting: fixes "can't drop at first day's left edge"
         const dayIndex = Math.max(0, Math.floor(dayIndexFloat));
 
@@ -560,7 +576,7 @@
         // --- POSITION ghost + outline (runs every frame for smooth movement) ---
         const newTop = (lineIndex * ROW_HEIGHT) + 10;
         const durationDays = durationMs / (1000 * 60 * 60 * 24);
-        const newWidth = durationDays * DAY_COLUMN_WIDTH;
+        const newWidth = durationDays * dayColumnWidth;
 
         // Clamp ghost left edge to 0 so it never renders off-screen and always aligns with where the task will land
         const clampedTaskLeftPixel = Math.max(0, taskLeftPixel);
@@ -568,7 +584,7 @@
         ghostTaskElement.style.transform = `translate3d(${clampedTaskLeftPixel}px, ${newTop}px, 0)`;
 
         if (dragOutlineElement) {
-            dragOutlineElement.style.transform = `translate3d(${dayIndex * DAY_COLUMN_WIDTH}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
+            dragOutlineElement.style.transform = `translate3d(${dayIndex * dayColumnWidth}px, ${lineIndex * ROW_HEIGHT}px, 0)`;
             dragOutlineElement.style.display = '';
         }
 
@@ -828,7 +844,7 @@
 
         // Determine day from task left-edge pixel (not mouse pixel)
         const taskLeftPixel = mouseX - taskOffsetLeft;
-        const dayIndexFloat = taskLeftPixel / DAY_COLUMN_WIDTH;
+        const dayIndexFloat = taskLeftPixel / dayColumnWidth;
         const dayIndex = Math.max(0, Math.floor(dayIndexFloat));
         const dayFraction = dayIndex === 0 && dayIndexFloat < 0 ? 0 : (dayIndexFloat - Math.floor(dayIndexFloat));
 
@@ -1024,7 +1040,7 @@
             // Adjusted styles for half height: h-12 is approx 48px. 
             // Removed MMM YYYY from date cell since it's above now.
             dateEl.className = `flex-shrink-0 text-center border-r border-gray-200 flex flex-col justify-center items-center ${day.isBlocked ? 'bg-gray-100 text-gray-500' : 'bg-white'} ${day.isToday ? 'bg-blue-50' : ''}`;
-            dateEl.style.width = `${DAY_COLUMN_WIDTH}px`;
+            dateEl.style.width = `${dayColumnWidth}px`;
             dateEl.style.height = '100%'; // Full height of the row container (h-12)
 
             dateEl.innerHTML = `
@@ -1073,14 +1089,14 @@
                     }
 
                     cell.className = `grid-cell absolute border-r border-b border-gray-200 ${bgClass} flex flex-col`;
-                    cell.style.left = `${dayIndex * DAY_COLUMN_WIDTH}px`;
+                    cell.style.left = `${dayIndex * dayColumnWidth}px`;
                     cell.style.top = `${lineIndex * ROW_HEIGHT}px`;
-                    cell.style.width = `${DAY_COLUMN_WIDTH}px`;
+                    cell.style.width = `${dayColumnWidth}px`;
                     cell.style.height = `${ROW_HEIGHT}px`;
                     cell.className = `grid-cell absolute border-r border-b border-gray-200 ${bgClass} flex flex-col`;
-                    cell.style.left = `${dayIndex * DAY_COLUMN_WIDTH}px`;
+                    cell.style.left = `${dayIndex * dayColumnWidth}px`;
                     cell.style.top = `${lineIndex * ROW_HEIGHT}px`;
-                    cell.style.width = `${DAY_COLUMN_WIDTH}px`;
+                    cell.style.width = `${dayColumnWidth}px`;
                     cell.style.height = `${ROW_HEIGHT}px`;
                     cell.dataset.lineId = line.id;
                     cell.dataset.date = formatDate(day.date, 'YYYY-MM-DD');
@@ -1185,6 +1201,35 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                 </svg>
             </button>
+
+            <!-- Divider -->
+            <span class="w-px h-5 bg-gray-200 mx-1"></span>
+
+            <!-- Zoom Out -->
+            <button
+                onclick={zoomOut}
+                disabled={dayColumnWidth <= ZOOM_MIN}
+                title="Zoom Out (max 2 months visible)"
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-full border border-purple-200 transition-colors"
+            >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
+                </svg>
+                Zoom Out
+            </button>
+
+            <!-- Zoom In -->
+            <button
+                onclick={zoomIn}
+                disabled={dayColumnWidth >= ZOOM_MAX}
+                title="Zoom In (min 4 days visible)"
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-full border border-purple-200 transition-colors"
+            >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                </svg>
+                Zoom In
+            </button>
         </div>
         
         <!-- Center: Date Range Display -->
@@ -1247,7 +1292,7 @@
             
             // Update current visible month based on scroll position
             const scrollLeft = e.target.scrollLeft;
-            const visibleDayIndex = Math.floor(scrollLeft / DAY_COLUMN_WIDTH);
+            const visibleDayIndex = Math.floor(scrollLeft / dayColumnWidth);
             if (calendarDays[visibleDayIndex]) {
                 currentVisibleMonth = formatDate(calendarDays[visibleDayIndex].date, 'MMM YYYY');
             }
