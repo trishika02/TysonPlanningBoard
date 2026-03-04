@@ -3,8 +3,8 @@
     import Sidebar from '$lib/components/Sidebar.svelte';
     import Tooltip from '$lib/components/Tooltip.svelte';
     import { floor_line_data } from '$lib/stores/data';
-    import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData } from '$lib/api-call';
-    import { calculateStripTimeline, calculateSingleStripTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
+    import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getShiftDetails } from '$lib/api-call';
+    import { calculateStripTimelines, calculateSingleStripTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
     import { onMount } from 'svelte';
     import { slide } from 'svelte/transition';
     
@@ -13,6 +13,7 @@
     let tasks = $state([]);
     let lines = $state([]);
     let workHoursData = $state([]); // Store work hours for recalculation
+    let shiftMap = $state({}); // Map of shift name → shift detail object
     let showUnplanned = $state(false); // State for toggling unplanned panel
     let showUnplanned2 = $state(false); // State for toggling second unplanned panel
     /** Dragged position for Unplanned panel (null = use default centered position) */
@@ -384,22 +385,30 @@ const ROW_HEIGHT = 36;
 
         lines = flatRows;
         
-        // Fetch strips data and work hours from API
-        const [stripsData, fetchedWorkHours] = await Promise.all([
+        // Fetch strips data, work hours, and shift details from API
+        const [stripsData, fetchedWorkHours, fetchedShifts] = await Promise.all([
             getStripsWithLearningCurve(),
-            getWorkHourData()
+            getWorkHourData(),
+            getShiftDetails()
         ]);
         console.log({stripsData});
         
         // Store work hours for later recalculation
         workHoursData = fetchedWorkHours || [];
         
+        // Build shift lookup map
+        if (fetchedShifts && fetchedShifts.length > 0) {
+            fetchedShifts.forEach((s) => { shiftMap[s.name] = s; });
+        } else {
+            shiftMap = { 'Day Shift': { name: 'Day Shift', startTime: '09:00:00' } };
+        }
+        
         if (stripsData && stripsData.length > 0) {
             // Calculate timelines using production system logic
-            const stripsWithTimelines = calculateStripTimeline(
+            const stripsWithTimelines = calculateStripTimelines(
                 stripsData,
                 workHoursData,
-                today
+                shiftMap
             );
             
             // Transform to application task format
