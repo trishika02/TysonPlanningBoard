@@ -331,9 +331,14 @@
                 lines = flatRows;
                 
                 // Fetch strips, work hours, and shift details in parallel
+                const startDateStr = today.toISOString().split('T')[0];
+                const endDateObj = new Date(today);
+                endDateObj.setDate(endDateObj.getDate() + 30);
+                const endDateStr = endDateObj.toISOString().split('T')[0];
+
                 const [stripsData, fetchedWorkHours, fetchedShifts] = await Promise.all([
                     getStripsWithLearningCurve(),
-                    getWorkHourData(),
+                    getWorkHourData(startDateStr, endDateStr),
                     getShiftDetails()
                 ]);
 

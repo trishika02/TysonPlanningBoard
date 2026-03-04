@@ -14,7 +14,7 @@
         today = new Date(),
         holidays = [],
         draggedUnplannedTask = null,
-        workHoursData = [],
+        workHoursData = $bindable([]),
         recalculateTask = null,
         onUnplannedDrop = () => {},
         onScroll = () => {}
@@ -26,9 +26,9 @@
     let workHourMap = new Map(); // Fast lookup cache
     let currentVisibleMonth = $state(''); // Track current visible month based on scroll
     
-    // Constants - Calendar starts on today and shows 60 days forward
+    // Constants - Calendar starts on today and shows 30 days forward
     let daysBefore = $state(0);  // Start on today (no days before)
-    let daysAfter = $state(60);   // Show 60 days after today
+    let daysAfter = $state(30);   // Show 30 days after today
     const DAY_COLUMN_WIDTH = 140; // Wider columns for better visibility
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
@@ -36,13 +36,33 @@
     const END_HOUR = 18;
 
     // Functions to load more days
-    function loadEarlierDays() {
+    async function loadEarlierDays() {
+        const startDateObj = new Date(today);
+        startDateObj.setDate(startDateObj.getDate() - daysBefore - 30);
+        const endDateObj = new Date(today);
+        endDateObj.setDate(endDateObj.getDate() - daysBefore);
+        
         daysBefore += 30;
+
+        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"));
+        if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
+            workHoursData = [...workHoursData, ...newAPIWorkHourData];
+        }
         renderBoard();
     }
 
-    function loadLaterDays() {
+    async function loadLaterDays() {
+        const startDateObj = new Date(today);
+        startDateObj.setDate(startDateObj.getDate() + daysAfter);
+        const endDateObj = new Date(today);
+        endDateObj.setDate(endDateObj.getDate() + daysAfter + 30);
+        
         daysAfter += 30;
+
+        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"));
+        if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
+            workHoursData = [...workHoursData, ...newAPIWorkHourData];
+        }
         renderBoard();
     }
 
@@ -207,8 +227,9 @@
         const segments = [];
 
         for (const day of calendarDays) {
-            // Match any blocked day (weekend OR holiday)
-            if (!day.isBlocked) continue;
+            // Match any blocked day or 0 work hour day for this line
+            const workHours = getLineWorkHours(day.date, task.lineId, day.isBlocked);
+            if (!day.isBlocked && workHours > 0) continue;
 
             // Check if the holiday day overlaps with the task range
             const dayStart = new Date(day.date);
@@ -558,7 +579,8 @@
 
             const leftEdgeDay = calendarDays[dayIndex];
             const isWeekendStart = leftEdgeDay.dayOfWeek === 5 || leftEdgeDay.dayOfWeek === 6;
-            const isLeftEdgeBlocked = isWeekendStart || leftEdgeDay.isBlocked;
+            const workHours = getLineWorkHours(leftEdgeDay.date, newLineId, leftEdgeDay.isBlocked);
+            const isLeftEdgeBlocked = isWeekendStart || leftEdgeDay.isBlocked || workHours === 0;
 
             // dayIndexFloat may be < dayIndex when clamped; clamp fraction to [0,1)
             const dayFraction = Math.max(0, dayIndexFloat - Math.floor(dayIndexFloat));
@@ -863,6 +885,11 @@
             newEndDate = new Date(newStartDate.getTime() + durationMs);
         }
 
+        if (isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate)) {
+            console.warn("Cannot drop: Task overlaps with an existing task.");
+            handleDragEnd();
+            return;
+        }
 
         if (newLineId && droppedTaskId) {
             const taskIndex = tasks.findIndex(t => t.id === droppedTaskId);
@@ -1037,8 +1064,11 @@
                         const percentPerHr = 100 / workHours;
                         gridLinesFaint = `repeating-linear-gradient(to right, #f0f0f0 0, #f0f0f0 1px, transparent 1px, transparent ${percentPerHr}%)`;
                         gridLinesStrong = `repeating-linear-gradient(to right, #a5b4fc 0, #a5b4fc 1px, transparent 1px, transparent ${percentPerHr}%)`;
+                    } else if (workHours === 0) {
+                         // Distinct look for 0 hours
+                         bgClass = 'bg-gray-100'; 
+                         gridLinesFaint = `repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(156, 163, 175, 0.2) 10px, rgba(156, 163, 175, 0.2) 20px)`;
                     } else {
-                         // If blocked or 0 hours, maybe distinct look?
                          bgClass = 'bg-gray-100'; 
                     }
 
@@ -1074,6 +1104,11 @@
                         label.className = "text-[9px] font-bold text-gray-500 uppercase tracking-tighter opacity-70";
                         label.innerText = `${workHours} h`;
                         hoursArea.appendChild(label);
+                    } else if (day.isBlocked || workHours === 0) {
+                        const label = document.createElement('span');
+                        label.className = "text-[10px] font-bold text-red-500/70 uppercase tracking-tighter font-extrabold";
+                        label.innerText = `HOLIDAY`;
+                        hoursArea.appendChild(label);
                     }
                     cell.appendChild(hoursArea);
 
@@ -1108,19 +1143,19 @@
         }
     });
 
-    onMount(async () => {
-        // Fetch work hour data from API
-        const apiWorkHourData = await getWorkHourData();
-     
-        
-        if (apiWorkHourData && apiWorkHourData.length > 0) {
-            // Deep clone to strip all Svelte 5 reactive proxies from objects
-            workHourDataList = JSON.parse(JSON.stringify(apiWorkHourData));
+    $effect(() => {
+        if (workHoursData && workHoursData.length > 0) {
+            workHourDataList = JSON.parse(JSON.stringify(workHoursData));
             workHourDataList.forEach(d => {
                 workHourMap.set(`${d.Line}_${d.Date}`, d);
             });
+            tick().then(() => {
+                 renderBoard();
+            });
         }
-        
+    });
+
+    onMount(() => {
         renderBoard();
     });
 
