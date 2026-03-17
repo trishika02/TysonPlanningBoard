@@ -1,11 +1,10 @@
 <script>
-    import { onMount, tick } from 'svelte';
-    import Task from '$lib/components/Task.svelte';
+    import { getWorkHourData } from '$lib/api-call';
     import ContextMenu from '$lib/components/ContextMenu.svelte';
-    import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
     import MergeTaskModal from '$lib/components/MergeTaskModal.svelte';
-	import { work_hour_data } from '$lib/stores/data';
-	import { getWorkHourData } from '$lib/api-call';
+    import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
+    import Task from '$lib/components/Task.svelte';
+    import { onMount, tick } from 'svelte';
 
     // Props
     let { 
@@ -827,6 +826,13 @@
         if (!droppedTaskId && draggedUnplannedTask) {
              droppedTaskId = draggedUnplannedTask.id;
              durationMs = (draggedUnplannedTask.total_days || 1) * 24 * 60 * 60 * 1000;
+        }
+
+        // If this is an unplanned task without start/end, reject and keep it unplanned.
+        if (draggedUnplannedTask && (!draggedUnplannedTask.start || !draggedUnplannedTask.end)) {
+            alert(`Cannot move task ${draggedUnplannedTask.orderId || draggedUnplannedTask.id} to board. Please provide start and end dates from backend before scheduling.`);
+            handleDragEnd();
+            return;
         }
 
         // Use pixel-based calculation (same as processDragOver) so the drop position

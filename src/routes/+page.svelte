@@ -1,11 +1,11 @@
         
         <script>
+            import { getFloorLineData } from '$lib/api-call';
             import Calendar from '$lib/components/Calendar.svelte';
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { floor_line_data } from '$lib/stores/data';
-            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData } from '$lib/api-call';
-            import { calculateSingleStripTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
+            import { calculateSingleStripTimeline } from '$lib/utils/taskCalculator';
             import { onMount } from 'svelte';
             import { slide } from 'svelte/transition';
             
@@ -156,8 +156,8 @@
                     orderId: 'PO-4569',
                     style: 'T-Shirt (Blue)',
                     quantity: 2000,
-                    start: '2026-02-20T01:00:00',
-                    end: '2026-02-25T05:00:00',
+                    // start: '2026-02-20T01:00:00',
+                    // end: '2026-02-25T05:00:00',
                     total_days: 5,
                     total_working_days: 4,
                     completed_days: 0,
@@ -357,6 +357,11 @@
             }
 
             function addToBoard(task, targetLineId = null) {
+                if (!task.start || !task.end) {
+                    alert(`Cannot move ${task.orderId || task.id} to board. Please fetch/assign start and end dates from backend before scheduling.`);
+                    return;
+                }
+
                 // Remove from unplanned
                 unplannedTasks = unplannedTasks.filter(t => t.id !== task.id);
                 
