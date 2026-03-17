@@ -708,7 +708,7 @@
 
         originalTask.quantity = newOriginalQuantity;
 
-        // 2. Recalculate original task timeline based on reduced quantity
+        // 2. Recalculate ORIGINAL task timeline based on its reduced quantity
         if (recalculateTask) {
             const startDate = new Date(originalTask.start);
             const result = recalculateTask(originalTask, startDate, originalTask.lineId);
@@ -718,23 +718,39 @@
             originalTask.total_days = result.total_days;
         }
 
-        // 3. Create NEW task starting after recalculated original task end
+        // 3. Build new split task starting right after the original ends
         const newTaskId = `${originalTask.id}-split-${Date.now()}`;
-
         const newTaskStart = new Date(originalTask.end);
-        const newTaskEnd = new Date(newTaskStart);
-        newTaskEnd.setDate(newTaskEnd.getDate() + 2);
 
-        const newTask = {
+        // Create a temporary task object for the split portion
+        const splitTaskDraft = {
             ...originalTask,
             id: newTaskId,
             quantity: splitQuantity,
             completed_quantity: 0,
-            completed_segments: [],
+            completed_segments: []
+        };
+
+        // 4. Use recalculateTask to get the correct end date for the split quantity
+        let newTaskEnd = new Date(newTaskStart);
+        newTaskEnd.setDate(newTaskEnd.getDate() + 2); // fallback
+        let splitTimeline = [];
+        let splitTotalDays = 2;
+
+        if (recalculateTask) {
+            const splitResult = recalculateTask(splitTaskDraft, newTaskStart, originalTask.lineId);
+            newTaskEnd = new Date(splitResult.end);
+            splitTimeline = splitResult.timeline || [];
+            splitTotalDays = splitResult.total_days || 2;
+        }
+
+        const newTask = {
+            ...splitTaskDraft,
             start: newTaskStart.toISOString(),
             end: newTaskEnd.toISOString(),
-            total_days: 2, // Approximate
-            total_working_days: 2 // Approximate
+            timeline: splitTimeline,
+            total_days: splitTotalDays,
+            total_working_days: splitTotalDays
         };
 
         // Adjust completed_quantity of original if it exceeds new quantity
@@ -742,12 +758,11 @@
             originalTask.completed_quantity = originalTask.quantity;
         }
 
-
         // Add new task to tasks array
         tasks.push(newTask);
         tasks = [...tasks]; // Trigger reactivity
 
-        console.log('MOCK_TASKS after split:', JSON.parse(JSON.stringify(tasks)));
+        console.log('Tasks after split:', JSON.parse(JSON.stringify(tasks)));
 
         // Close modal and reset state
         showSplitModal = false;
@@ -1017,8 +1032,9 @@
                 isOffDay = hasAnyData && allZero;
             }
 
+            const isFriSat = dayOfWeek === 5 || dayOfWeek === 6; // Fri=5, Sat=6 always off
             const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
-            const isBlocked = isOffDay || isHoliday;
+            const isBlocked = isOffDay || isHoliday || isFriSat;
 
             // Check if this date is today
             const todayDateStr = formatDate(today, 'YYYY-MM-DD');
@@ -1030,6 +1046,7 @@
                 dayOfWeek,
                 isBlocked,
                 isHoliday,
+                isFriSat,
                 isToday
             });
         }
