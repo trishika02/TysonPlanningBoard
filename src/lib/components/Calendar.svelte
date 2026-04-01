@@ -728,11 +728,13 @@
 
         originalTask.quantity = newOriginalQuantity;
 
-        // 2. Recalculate ORIGINAL task timeline based on its reduced quantity
+        // 2. Recalculate ORIGINAL task timeline based on its reduced quantity.
+        // Important: preserve the original start — recalculateTask may snap it
+        // to a work-day boundary which would shift the task backward visually.
         if (recalculateTask) {
             const startDate = new Date(originalTask.start);
             const result = recalculateTask(originalTask, startDate, originalTask.lineId);
-            originalTask.start = result.start;
+            // Do NOT update originalTask.start — keep the task exactly where it is.
             originalTask.end = result.end;
             originalTask.timeline = result.timeline;
             originalTask.total_days = result.total_days;
