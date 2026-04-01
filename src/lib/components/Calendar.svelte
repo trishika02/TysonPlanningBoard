@@ -390,22 +390,39 @@
             taskOffsetLeft: taskOffsetLeft
         }));
 
-        // Create a custom drag image that shows the task at the correct offset
-        const dragImage = e.target.cloneNode(true);
-        dragImage.style.position = 'absolute';
-        dragImage.style.top = '-9999px';
-        dragImage.style.opacity = '1';
+        // Use a small compact pill as the native drag ghost instead of cloning the
+        // full task element (which can be thousands of pixels wide for long tasks).
+        const draggedTask = tasks.find(t => t.id === draggedTaskId) || taskPtr;
+        const dragImage = document.createElement('div');
+        dragImage.style.cssText = [
+            'position:absolute',
+            'top:-9999px',
+            'left:0',
+            'width:160px',
+            'height:28px',
+            'background:#3b82f6',
+            'border:1px solid #1d4ed8',
+            'border-radius:6px',
+            'display:flex',
+            'align-items:center',
+            'justify-content:center',
+            'color:#fff',
+            'font-size:12px',
+            'font-weight:600',
+            'padding:0 10px',
+            'box-shadow:0 4px 12px rgba(0,0,0,0.25)',
+            'white-space:nowrap',
+            'overflow:hidden',
+            'pointer-events:none',
+        ].join(';');
+        dragImage.textContent = draggedTask?.orderId || draggedTask?.id || 'Task';
         document.body.appendChild(dragImage);
 
-        // Set drag image offset so the cursor is at the grab point
-        // This makes the left edge appear at mouseX - taskOffsetLeft
-        const dragImageOffsetY = e.clientY - taskRect.top;
-        e.dataTransfer.setDragImage(dragImage, taskOffsetLeft, dragImageOffsetY);
+        e.dataTransfer.setDragImage(dragImage, 80, 14); // center of the pill
 
-        // Clean up the temporary drag image after a short delay
         setTimeout(() => {
-            document.body.removeChild(dragImage);
-        }, 0);
+            if (dragImage.parentNode) dragImage.parentNode.removeChild(dragImage);
+        }, 100);
 
         // Disable pointer-events on all tasks during drag so events reach grid cells.
         // Controlled reactively via isDragging passed to Task components.
@@ -573,13 +590,16 @@
         }
 
         // --- POSITION ghost + outline (runs every frame for smooth movement) ---
-        const newTop = (lineIndex * ROW_HEIGHT) + 10;
+        const ghostHeight = ROW_HEIGHT - FOOTER_HEIGHT - 10;
+        const newTop = Math.min((lineIndex * ROW_HEIGHT) + 10, (lines.length - 1) * ROW_HEIGHT);
         const durationDays = durationMs / (1000 * 60 * 60 * 24);
         const newWidth = durationDays * dayColumnWidth;
 
-        // Clamp ghost left edge to 0 so it never renders off-screen and always aligns with where the task will land
-        const clampedTaskLeftPixel = Math.max(0, taskLeftPixel);
+        // Clamp ghost so it stays within the grid (left edge ≥ 0, right edge ≤ grid total width)
+        const gridTotalWidth = calendarDays.length * dayColumnWidth;
+        const clampedTaskLeftPixel = Math.min(Math.max(0, taskLeftPixel), Math.max(0, gridTotalWidth - newWidth));
         ghostTaskElement.style.width = `${newWidth}px`;
+        ghostTaskElement.style.height = `${ghostHeight}px`;
         ghostTaskElement.style.transform = `translate3d(${clampedTaskLeftPixel}px, ${newTop}px, 0)`;
 
         if (dragOutlineElement) {
@@ -1321,7 +1341,7 @@
             }
         }}
     >
-        <div id="calendar-grid" class="relative min-w-max">
+        <div id="calendar-grid" class="relative min-w-max" style="overflow: clip; height: {lines.length * ROW_HEIGHT}px;">
             <!-- 1. Grid Background Layer (Managed by Vanilla JS) -->
             <div id="grid-background-layer" class="absolute inset-0 z-0">
                 <!-- Grid cells injected here -->
