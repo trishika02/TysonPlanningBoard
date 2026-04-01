@@ -536,10 +536,14 @@
         // --- UNPLANNED TASK GHOST CREATION (one-time, must be synchronous) ---
         if (!draggedTaskId && draggedUnplannedTask && !ghostTaskElement) {
              const estimatedWidth = (draggedUnplannedTask.total_days || 1) * dayColumnWidth;
-             if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
-             if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
-             const relX = e.clientX - cachedGridRect.left;
-             const relY = e.clientY - cachedGridRect.top;
+             // Always re-read live — grid rect changes as the user scrolls
+             const _body = document.getElementById('calendar-body');
+             const _gridRect = document.getElementById('calendar-grid').getBoundingClientRect();
+             cachedGridRect = _gridRect;
+             cachedCalendarBody = _body;
+             // relX must include scroll offset so ghost appears under the cursor
+             const relX = e.clientX - _gridRect.left + (_body ? _body.scrollLeft : 0);
+             const relY = e.clientY - _gridRect.top;
              createGhostTask(`${estimatedWidth}px`, `${relY}px`, `${relX}px`);
         }
 
@@ -553,11 +557,15 @@
 
         if (!ghostTaskElement) return;
 
-        if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
-        const gridRect = cachedGridRect || document.getElementById('calendar-grid').getBoundingClientRect();
-        if (!cachedGridRect) cachedGridRect = gridRect;
+        // Always read live: viewport rect shifts as the user scrolls
+        const calBody = cachedCalendarBody || document.getElementById('calendar-body');
+        if (!cachedCalendarBody) cachedCalendarBody = calBody;
+        // Use calendar-body as the reference (fixed in viewport), then add scrollLeft
+        // to get absolute pixel position within the grid.
+        const bodyRect = calBody ? calBody.getBoundingClientRect() : { left: 0, top: 0 };
+        const scrollLeft = calBody ? calBody.scrollLeft : 0;
 
-        const relY = lastDragClientY - gridRect.top;
+        const relY = lastDragClientY - bodyRect.top;
         const lineIndex = Math.floor(relY / ROW_HEIGHT);
 
         if (lineIndex < 0 || lineIndex >= lines.length) return;
@@ -575,7 +583,7 @@
              }
         }
 
-        const mouseX = lastDragClientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
+        const mouseX = (lastDragClientX - bodyRect.left) + scrollLeft;
         const taskLeftPixel = mouseX - taskOffsetLeft;
 
         const dayIndexFloat = taskLeftPixel / dayColumnWidth;
@@ -874,11 +882,18 @@
 
         // Use pixel-based calculation (same as processDragOver) so the drop position
         // always matches the ghost's left edge — not the mouse position.
-        if (!cachedGridRect) cachedGridRect = document.getElementById('calendar-grid').getBoundingClientRect();
-        if (!cachedCalendarBody) cachedCalendarBody = document.getElementById('calendar-body');
+        // Always recalculate fresh at drop time: cachedGridRect may be null (sidebar drags)
+        // or stale (user scrolled after drag started). scrollLeft must reflect current position.
+        const calendarBody = document.getElementById('calendar-body');
+        const calendarGrid = document.getElementById('calendar-grid');
+        const scrollLeft = calendarBody ? calendarBody.scrollLeft : 0;
+        // Use the scroll container (calendar-body) as reference, then add scrollLeft
+        // to convert viewport-relative mouse position into grid-absolute pixel position.
+        // Using the GRID rect directly would double-count scroll (grid shifts left as you scroll).
+        const bodyRect = calendarBody ? calendarBody.getBoundingClientRect() : { left: 0, top: 0 };
 
-        const mouseX = e.clientX - cachedGridRect.left + cachedCalendarBody.scrollLeft;
-        const mouseY = e.clientY - cachedGridRect.top;
+        const mouseX = (e.clientX - bodyRect.left) + scrollLeft;
+        const mouseY = e.clientY - bodyRect.top;
 
         // Determine line from Y
         const lineIndex = Math.floor(mouseY / ROW_HEIGHT);
@@ -1343,7 +1358,7 @@
             }
         }}
     >
-        <div id="calendar-grid" class="relative min-w-max" style="overflow: clip; height: {lines.length * ROW_HEIGHT}px;">
+        <div id="calendar-grid" class="relative min-w-max" style="height: {lines.length * ROW_HEIGHT}px;">
             <!-- 1. Grid Background Layer (Managed by Vanilla JS) -->
             <div id="grid-background-layer" class="absolute inset-0 z-0">
                 <!-- Grid cells injected here -->

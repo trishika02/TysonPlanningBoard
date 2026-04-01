@@ -334,6 +334,16 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
         sewingStartDate,
     } = strip;
 
+    // Safe helper: get efficiency from learning curve, or fall back to 50%
+    const curve = Array.isArray(learningCurveTable) && learningCurveTable.length > 0
+        ? learningCurveTable
+        : null;
+    const getEfficiency = (dayIndex) => {
+        if (!curve) return 50;
+        const entry = curve[Math.min(dayIndex, curve.length - 1)];
+        return (entry && entry.efficiency != null) ? entry.efficiency : 50;
+    };
+
     let stripPendingQty = stripQtyOverride ?? strip.quantity;
     let planned_qty = 0;
     let counter = 0;
@@ -379,7 +389,7 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
                 working_hour_day_capacity: 0,
                 working_hour: 0,
                 man_power: totalManpower,
-                efficiency: learningCurveTable[Math.min(counter, learningCurveTable.length - 1)].efficiency || 0,
+                efficiency: getEfficiency(counter),
                 per_hour_qty: 0,
                 target_qty_at_100_eff: 0,
                 day_capacity: 0,
@@ -415,9 +425,7 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
         // --- Manpower ---
         row.man_power = totalManpower;
 
-        // --- Efficiency (from learning curve) ---
-        row.efficiency =
-            learningCurveTable[Math.min(counter, learningCurveTable.length - 1)].efficiency || 0;
+        row.efficiency = getEfficiency(counter);
 
         // --- Per Hour Qty (floored — matches ERPNext) ---
         row.per_hour_qty = Math.floor(
