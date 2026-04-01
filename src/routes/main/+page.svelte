@@ -482,14 +482,14 @@
     <div class="fixed bottom-12 z-50 flex gap-4" style="left: calc(50% + 8rem); transform: translateX(-50%);">
         <button 
             class="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-700 transition-all font-medium"
-            onclick={() => showUnplanned = !showUnplanned}
+            onclick={() => { showUnplanned = !showUnplanned; if (showUnplanned) showUnplanned2 = false; }}
         >
             Available Strip
         </button>
 
         <button 
             class="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all font-medium"
-            onclick={() => showUnplanned2 = !showUnplanned2}
+            onclick={() => { showUnplanned2 = !showUnplanned2; if (showUnplanned2) showUnplanned = false; }}
         >
             Unplanned Orders
         </button>
