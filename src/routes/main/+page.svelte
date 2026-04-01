@@ -59,9 +59,10 @@
                         id: item.Id,
                         name: item.Name,
                         lines: item.Lines.map((line) => {
-                            return {
+                        return {
                                 id: line.Id,
-                                name: line.Name
+                                name: line.Name,
+                                manpower: line.TotalManpower || 0
                             }
                         })
                     }
@@ -323,7 +324,8 @@
                             id: line.id,
                             name: line.name,
                             type: 'line',
-                            parentId: floor.id
+                            parentId: floor.id,
+                            manpower: line.manpower || 0
                         });
                     }
                 }
@@ -435,12 +437,19 @@
                 const shiftData = shiftMap[shiftName]
                     ?? { name: shiftName, startTime: '09:00:00' };
 
-                // Build strip data for timeline calculation
+                // Build strip data for timeline calculation.
+                // Use the TARGET LINE's manpower if available (moved to a line with different capacity);
+                // fall back to the task's original manpower if the line data doesn't carry it.
+                const targetLine = lines.find(l => l.id === newLineId);
+                const effectiveManpower = (targetLine?.manpower > 0 ? targetLine.manpower : null)
+                    ?? task.manpower
+                    ?? 1;
+
                 const stripData = {
                     lineId: newLineId,
                     quantity: task.quantity,
                     smv: task.smv,
-                    totalManpower: task.manpower,
+                    totalManpower: effectiveManpower,
                     learningCurveTable: task.learningCurve || [],
                     sewingStartDate: newStartDate.toISOString()
                 };
