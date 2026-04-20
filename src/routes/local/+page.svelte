@@ -342,15 +342,19 @@
                 try {
                     const stripsToUpdate = tasks
                         .filter(task => task.lineId && task.id)
-                        .map(task => ({
-                            id: task.id,
-                            lineId: task.lineId,
-                            sewingStartDate: formatToERPDateTime(task.start),
-                            deliveryDate: formatToERPDateTime(task.end),
-                            stripTimelineTable: task.timeline || [],
-                            total_days: task.total_days,
-                            total_working_days: task.total_working_days
-                        }));
+                        .map(task => {
+                            const matchedLine = lines.find(l => l.id === task.lineId);
+                            return {
+                                id: task.id,
+                                lineId: task.lineId,
+                                floorId: matchedLine?.parentId ?? null,   // ← add this
+                                sewingStartDate: formatToERPDateTime(task.start),
+                                deliveryDate: formatToERPDateTime(task.end),
+                                stripTimelineTable: task.timeline || [],
+                                total_days: task.total_days,
+                                total_working_days: task.total_working_days
+                            };
+                        });
                     
                     if (stripsToUpdate.length === 0) {
                         setSaveStatus('success', 'No changes to save');
