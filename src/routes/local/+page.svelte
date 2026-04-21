@@ -1,6 +1,6 @@
         
         <script>
-            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getShiftDetails, updateStripsFromTyson} from '$lib/api-call';
+            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getShiftDetails, updateStripsFromTyson, saveTysonChanges} from '$lib/api-call';
             import Calendar from '$lib/components/Calendar.svelte';
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
@@ -30,7 +30,9 @@
             
             // Save state
             let isSaving = $state(false);
-            // Track merged strip pairs for backend sync on save
+            // Track changes for backend sync on save
+            let pendingUpdates = $state(new Set());
+            let pendingSplits = $state([]);
             
             // Register save function with layout
             const registerSave = getContext('registerSave');
@@ -340,42 +342,60 @@
                 setSaveStatus('saving', 'Saving changes...');
                 
                 try {
-                    const stripsToUpdate = tasks
-                        .filter(task => task.lineId && task.id)
-                        .map(task => {
+                    // 1. Map updated strips (moved or resized)
+                    const stripsToUpdate = [];
+                    pendingUpdates.forEach(id => {
+                        const task = tasks.find(t => t.id === id);
+                        if (task && task.lineId) {
                             const matchedLine = lines.find(l => l.id === task.lineId);
-                            return {
+                            stripsToUpdate.push({
                                 id: task.id,
                                 lineId: task.lineId,
-                                floorId: matchedLine?.parentId ?? null,   // ← add this
+                                floorId: matchedLine?.parentId ?? null,
                                 sewingStartDate: formatToERPDateTime(task.start),
                                 deliveryDate: formatToERPDateTime(task.end),
+                                strip_qty: task.quantity,
                                 stripTimelineTable: task.timeline || [],
                                 total_days: task.total_days,
                                 total_working_days: task.total_working_days
-                            };
-                        });
+                            });
+                        }
+                    });
+
+                    // 2. Map split operations (formatted for backend)
+                    const formattedSplits = pendingSplits.map(split => ({
+                        ...split,
+                        sewingStartDate: formatToERPDateTime(split.sewingStartDate),
+                        deliveryDate: formatToERPDateTime(split.deliveryDate)
+                    }));
                     
-                    if (stripsToUpdate.length === 0) {
+                    if (stripsToUpdate.length === 0 && formattedSplits.length === 0) {
                         setSaveStatus('success', 'No changes to save');
                         setTimeout(() => setSaveStatus('', ''), 3000);
                         isSaving = false;
                         return;
                     }
 
-                    // --- 1. Save regular strip updates ---
-                    if (stripsToUpdate.length > 0) {
-                        console.log('Saving strips to backend:', stripsToUpdate);
-                        const result = await updateStripsFromTyson(stripsToUpdate);
-                        if (result.status !== 'success') {
-                            setSaveStatus('error', result.message || 'Failed to save strip changes');
-                            setTimeout(() => setSaveStatus('', ''), 5000);
-                            isSaving = false;
-                            return;
-                        }
+                    // --- Consolidated Save Call ---
+                    console.log('Saving to backend:', { updates: stripsToUpdate, splits: formattedSplits });
+                    const result = await saveTysonChanges({
+                        updates: stripsToUpdate,
+                        splits: formattedSplits
+                    });
+
+                    if (result.status !== 'success') {
+                        setSaveStatus('error', result.message || 'Failed to save changes');
+                        setTimeout(() => setSaveStatus('', ''), 5000);
+                        isSaving = false;
+                        return;
                     }
 
                     setSaveStatus('success', `Successfully saved`);
+                    
+                    // Clear tracking buffers
+                    pendingUpdates.clear();
+                    pendingSplits = [];
+                    
                     setTimeout(() => setSaveStatus('', ''), 5000);
                 } catch (error) {
                     console.error('Error saving changes:', error);
@@ -556,6 +576,8 @@
             onScroll={(scrollTop) => {
                 if (sidebar) sidebar.setScrollTop(scrollTop);
             }} 
+            bind:pendingUpdates
+            bind:pendingSplits
         />
     </div>
 

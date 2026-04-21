@@ -16,7 +16,9 @@
         workHoursData = $bindable([]),
         recalculateTask = null,
         onUnplannedDrop = () => {},
-        onScroll = () => {}
+        onScroll = () => {},
+        pendingUpdates = $bindable(new Set()),
+        pendingSplits = $bindable([])
     } = $props();
 
     // Internal State
@@ -788,9 +790,24 @@
             originalTask.completed_quantity = originalTask.quantity;
         }
 
-        // Add new task to tasks array
+        // Add to new task to tasks array
         tasks.push(newTask);
         tasks = [...tasks]; // Trigger reactivity
+
+        // Track split action for backend
+        pendingSplits.push({
+            originalId: selectedTaskForSplit.id,
+            splitQuantity: splitQuantity,
+            newId: newTaskId,
+            lineId: originalTask.lineId,
+            floorId: lines.find(l => l.id === originalTask.lineId)?.parentId,
+            sewingStartDate: newTask.start,
+            deliveryDate: newTask.end
+        });
+        pendingSplits = [...pendingSplits]; // Trigger reactivity
+
+        // Also track original as updated (quantity changed)
+        pendingUpdates.add(selectedTaskForSplit.id);
 
         console.log('Tasks after split:', JSON.parse(JSON.stringify(tasks)));
 
@@ -981,6 +998,7 @@
                 } else {
                     tasks[taskIndex].end = newEndDate.toISOString();
                 }
+                pendingUpdates.add(droppedTaskId);
             } else if (draggedUnplannedTask && droppedTaskId === draggedUnplannedTask.id) {
                 // New Task — same: use newStartDate for pixel-accurate placement.
                 const newTask = {
@@ -998,6 +1016,7 @@
                 }
                 tasks.push(newTask);
                 onUnplannedDrop(droppedTaskId);
+                pendingUpdates.add(droppedTaskId);
             }
         }
 

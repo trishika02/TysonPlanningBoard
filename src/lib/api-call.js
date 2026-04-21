@@ -77,3 +77,24 @@ export const updateStripsFromTyson = async (stripsData) => {
 		return { success: false, error: error.message };
 	}
 };
+export const saveTysonChanges = async (changes) => {
+	const url = '/api/method/asl_core.asl_production.doctype.strip.strip.save_tyson_changes';
+	try {
+		const response = await fetch(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ data: JSON.stringify(changes) })
+		});
+		if (!response.ok) {
+			console.error('Failed to save changes:', response.statusText);
+			return { success: false, error: response.statusText };
+		}
+		const result = await response.json();
+		return result?.message || { status: 'success', message: 'Changes saved successfully' };
+	} catch (error) {
+		console.error('Error saving changes:', error);
+		return { success: false, error: error.message };
+	}
+};
