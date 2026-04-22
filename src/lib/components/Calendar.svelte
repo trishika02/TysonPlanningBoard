@@ -3,6 +3,7 @@
     import ContextMenu from '$lib/components/ContextMenu.svelte';
     import MergeTaskModal from '$lib/components/MergeTaskModal.svelte';
     import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
+    import StripDetailsModal from '$lib/components/StripDetailsModal.svelte';
     import Task from '$lib/components/Task.svelte';
     import { onMount, tick } from 'svelte';
 
@@ -119,6 +120,8 @@
     let showMergeModal = $state(false);
     let selectedTaskForMerge = $state(null);
     let mergeCandidates = $state([]);
+    let showStripDetailsModal = $state(false);
+    let selectedTaskForDetails = $state(null);
 
     // Helpers
     function getStandardWorkHours(dayOfWeek) {
@@ -710,6 +713,9 @@
             selectedTaskForMerge = selectedTaskForContext;
             mergeCandidates = candidates;
             showMergeModal = true;
+        } else if (item.id === 'strip-details' && selectedTaskForContext) {
+            selectedTaskForDetails = selectedTaskForContext;
+            showStripDetailsModal = true;
         }
         showContextMenu = false;
     }
@@ -1426,7 +1432,8 @@
         y={contextMenuY}
         menuItems={[
             { id: 'split', label: 'Split Task', icon: '✂️' },
-            { id: 'merge', label: 'Merge Task', icon: '🔗' }
+            { id: 'merge', label: 'Merge Task', icon: '🔗' },
+            { id: 'strip-details', label: 'Strip Details', icon: '📋' }
         ]}
         onItemClick={handleContextMenuItemClick}
         onClose={handleContextMenuClose}
@@ -1447,6 +1454,13 @@
         candidates={mergeCandidates}
         onMerge={handleMergeTask}
         onCancel={handleMergeModalCancel}
+    />
+
+    <!-- Strip Details Modal -->
+    <StripDetailsModal
+        bind:visible={showStripDetailsModal}
+        task={selectedTaskForDetails}
+        onClose={() => { showStripDetailsModal = false; selectedTaskForDetails = null; }}
     />
 </div>
 
