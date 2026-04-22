@@ -18,7 +18,8 @@
         onUnplannedDrop = () => {},
         onScroll = () => {},
         pendingUpdates = $bindable(new Set()),
-        pendingSplits = $bindable([])
+        pendingSplits = $bindable([]),
+        pendingMerges = $bindable([])
     } = $props();
 
     // Internal State
@@ -852,6 +853,16 @@
         sourceTask.end = newEnd.toISOString();
         
         tasks = [...tasks]; // Trigger reactivity
+
+        // Track merge for backend
+        pendingMerges.push({
+            sourceId: targetTask.id,
+            targetId: sourceTask.id
+        });
+        pendingMerges = [...pendingMerges]; // Trigger reactivity
+        
+        // Also track target B as updated (since its quantity/end date changed)
+        pendingUpdates.add(sourceTask.id);
 
         // Log the updated MOCK_TASKS (tasks array)
         console.log('MOCK_TASKS after merge:', JSON.parse(JSON.stringify(tasks)));

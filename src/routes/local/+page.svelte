@@ -33,6 +33,7 @@
             // Track changes for backend sync on save
             let pendingUpdates = $state(new Set());
             let pendingSplits = $state([]);
+            let pendingMerges = $state([]);
             
             // Register save function with layout
             const registerSave = getContext('registerSave');
@@ -369,7 +370,7 @@
                         deliveryDate: formatToERPDateTime(split.deliveryDate)
                     }));
                     
-                    if (stripsToUpdate.length === 0 && formattedSplits.length === 0) {
+                    if (stripsToUpdate.length === 0 && formattedSplits.length === 0 && pendingMerges.length === 0) {
                         setSaveStatus('success', 'No changes to save');
                         setTimeout(() => setSaveStatus('', ''), 3000);
                         isSaving = false;
@@ -377,10 +378,15 @@
                     }
 
                     // --- Consolidated Save Call ---
-                    console.log('Saving to backend:', { updates: stripsToUpdate, splits: formattedSplits });
+                    console.log('Saving to backend:', { 
+                        updates: stripsToUpdate, 
+                        splits: formattedSplits,
+                        merges: pendingMerges
+                    });
                     const result = await saveTysonChanges({
                         updates: stripsToUpdate,
-                        splits: formattedSplits
+                        splits: formattedSplits,
+                        merges: pendingMerges
                     });
 
                     if (result.status !== 'success') {
@@ -395,6 +401,7 @@
                     // Clear tracking buffers
                     pendingUpdates.clear();
                     pendingSplits = [];
+                    pendingMerges = [];
                     
                     setTimeout(() => setSaveStatus('', ''), 5000);
                 } catch (error) {
@@ -578,6 +585,7 @@
             }} 
             bind:pendingUpdates
             bind:pendingSplits
+            bind:pendingMerges
         />
     </div>
 
