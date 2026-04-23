@@ -11,11 +11,12 @@
         formatDate,
         onClick = null,
         isMergeCandidate = false,
-        isDimmed = false 
+        isDimmed = false,
+        isLocked = false
     } = $props();
 
     function handleDragStart(e) {
-        if (isDimmed) {
+        if (isDimmed || isLocked) {
             e.preventDefault();
             return;
         }
@@ -55,12 +56,21 @@
     function handleRemainingEnter(e) {
         const startStr = formatDate(new Date(task.start), 'YYYY-MM-DD HH:mm');
         const endStr = formatDate(new Date(task.end), 'YYYY-MM-DD HH:mm');
-        const remainingQty = task.quantity - (task.completed_quantity || 0);
+        const producedQty = task.completed_quantity || 0;
+        const statusStr = isLocked ? '<span class="text-green-400 font-bold">Started</span>' : '<span class="text-blue-400">Not Started</span>';
+        
         const content = `
-            <strong>Order:</strong> ${task.orderId}<br>
-            <strong>Remaining Qty:</strong> ${remainingQty}<br>
-            <strong>Start:</strong> ${startStr}<br>
-            <strong>End:</strong> ${endStr}
+            <div class="space-y-1">
+                <div class="flex justify-between gap-4 border-b border-white/20 pb-1 mb-1">
+                    <span class="font-extrabold uppercase tracking-wider">${task.style}</span>
+                    <span>${statusStr}</span>
+                </div>
+                <div><strong>Buyer:</strong> ${task.customer || 'N/A'}</div>
+                <div><strong>Sales Order:</strong> ${task.orderId}</div>
+                <div><strong>Quantity:</strong> ${producedQty} / ${task.quantity} <span class="text-xs opacity-70">(${Math.round((producedQty/task.quantity)*100)}%)</span></div>
+                <div><strong>Start:</strong> ${startStr}</div>
+                <div><strong>End:</strong> ${endStr}</div>
+            </div>
         `;
         tooltipStore.show(e.pageX, e.pageY, content);
     }
@@ -93,11 +103,29 @@
         }
     }
 
+    // 3. Production Lag (Danger/Warning)
+    let isBehindSchedule = $derived.by(() => {
+        if (!task.timeline || task.timeline.length === 0) return false;
+        
+        // Check all days until today (or all days if finished)
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        for (const day of task.timeline) {
+            // Only check days that should have some production by now
+            if (day.date <= todayStr) {
+                if ((day.completed_qty || 0) < (day.planned_production_qty || 0)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    });
+
     // 2. Time Progress (Background Gradient)
     function getBackgroundStyle() {
         // Colors
-        const COLOR_COMPLETED = '#1d4ed8'; // blue-700
-        const COLOR_REMAINING = '#60a5fa'; // blue-400
+        const COLOR_COMPLETED = isBehindSchedule ? '#b91c1c' : '#1d4ed8'; // red-700 if behind, else blue-700
+        const COLOR_REMAINING = isBehindSchedule ? '#f87171' : '#60a5fa'; // red-400 if behind, else blue-400
         
         // Fallback default
         let background = `background-color: ${COLOR_REMAINING};`;
@@ -115,11 +143,12 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     id="{task.id}-task"
-    class="task absolute border border-blue-900/10 rounded text-white shadow-sm overflow-hidden cursor-grab active:cursor-grabbing z-10 pointer-events-auto flex items-center justify-center px-2 transition-all duration-300
+    class="task absolute border border-blue-900/10 rounded text-white shadow-sm overflow-hidden z-10 pointer-events-auto flex items-center justify-center px-2 transition-all duration-300
+    {isLocked ? 'cursor-not-allowed opacity-90 grayscale-[0.3]' : 'cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-blue-400'}
     {isMergeCandidate ? 'ring-4 ring-green-400 ring-offset-2 z-50 scale-105 cursor-pointer !bg-green-500' : ''} 
     {isDimmed ? 'opacity-20 grayscale pointer-events-none' : ''}"
     style="{style} {getBackgroundStyle()}"
-    draggable={!isDimmed && !isMergeCandidate}
+    draggable={!isDimmed && !isMergeCandidate && !isLocked}
     role="button"
     tabindex="0"
     ondragstart={handleDragStart}
@@ -136,6 +165,14 @@
     onmouseleave={handleMouseLeave}
     data-task-id={task.id}
 >
+    <!-- Lock Icon for started strips -->
+    {#if isLocked}
+        <div class="absolute top-1 right-1 z-20 opacity-70">
+            <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+            </svg>
+        </div>
+    {/if}
     <!-- Background Progress Segments (Full Height) -->
     {#if task.completed_segments && task.completed_segments.length > 0}
         <div class="absolute inset-0 w-full h-full flex overflow-hidden pointer-events-none">

@@ -705,14 +705,19 @@
             selectedTaskForSplit = selectedTaskForContext;
             showSplitModal = true;
         } else if (item.id === 'merge' && selectedTaskForContext) {
-             // Show ALL other tasks as candidates (as per user request "show other task from MOCK_TASKS")
-             // We can visually distinguish matching/non-matching in the modal if needed, 
-             // but for now we won't filter them out.
-             const candidates = tasks.filter(t => t.id !== selectedTaskForContext.id);
+             // Filter candidates: same customer AND same style
+             // style in task is formatted as "Style (Color)", so we might need to extract the base style
+             const getBaseStyle = (s) => s.split(' (')[0];
+             const sourceBaseStyle = getBaseStyle(selectedTaskForContext.style);
+
+             mergeCandidates = tasks.filter(t => 
+                 t.id !== selectedTaskForContext.id && 
+                 t.customer === selectedTaskForContext.customer &&
+                 getBaseStyle(t.style) === sourceBaseStyle
+             );
             
-            selectedTaskForMerge = selectedTaskForContext;
-            mergeCandidates = candidates;
-            showMergeModal = true;
+             selectedTaskForMerge = selectedTaskForContext;
+             showMergeModal = true;
         }
         showContextMenu = false;
     }
@@ -1253,7 +1258,16 @@
         if (workHoursData && workHoursData.length > 0) {
             workHourDataList = JSON.parse(JSON.stringify(workHoursData));
             workHourDataList.forEach(d => {
-                workHourMap.set(`${d.Line}_${d.Date}`, d);
+                const key = `${d.Line}_${d.Date}`;
+                const existing = workHourMap.get(key);
+                if (existing) {
+                    existing.WorkHour = (parseFloat(existing.WorkHour) || 0) + (parseFloat(d.WorkHour) || 0);
+                    if (d.Shift && !existing.Shifts?.includes(d.Shift)) {
+                        existing.Shifts = [...(existing.Shifts || [existing.Shift]), d.Shift];
+                    }
+                } else {
+                    workHourMap.set(key, { ...d, Shifts: d.Shift ? [d.Shift] : [] });
+                }
             });
             tick().then(() => {
                  renderBoard();
