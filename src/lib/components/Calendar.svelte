@@ -719,8 +719,9 @@
                  getBaseStyle(t.style) === sourceBaseStyle
              );
             
-             selectedTaskForMerge = selectedTaskForContext;
-             showMergeModal = true;
+            selectedTaskForMerge = selectedTaskForContext;
+            mergeCandidates = candidates;
+            showMergeModal = true;
         } else if (item.id === 'strip-details' && selectedTaskForContext) {
             selectedTaskForDetails = selectedTaskForContext;
             showStripDetailsModal = true;
