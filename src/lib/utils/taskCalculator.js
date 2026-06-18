@@ -519,7 +519,7 @@ export function calculateStripTimelines(strips, dailyWorkHours, shiftMap) {
             .sort((a, b) => a.Date.localeCompare(b.Date));
 
         if (lineWorkHours.length === 0) {
-            return { ...strip, error: 'No work hour data for line' };
+            return fallbackStripTimeline(strip);
         }
 
         // Resolve shift from first work hour record (matches ERPNext behavior)
@@ -544,4 +544,37 @@ export function calculateStripTimelines(strips, dailyWorkHours, shiftMap) {
                 : null,
         };
     });
+}
+
+function fallbackStripTimeline(strip) {
+    const timeline = (strip.strip_timeline_table || []).map((row) => ({
+        date: row.date,
+        day: new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' }),
+        shift_start_time: row.shift_start_time || '08:00:00',
+        shift_end_time: row.shift_end_time || '17:00:00',
+        working_hour_day_capacity: 0,
+        working_hour: 0,
+        man_power: strip.totalManpower || 0,
+        efficiency: row.efficiency || 0,
+        per_hour_qty: 0,
+        target_qty_at_100_eff: 0,
+        day_capacity: 0,
+        planned_production_qty: row.planned_production_qty || 0,
+        total_minutes: 0,
+        strip_pending_qty: 0,
+        strip_produced_qty: 0,
+        total_qty: strip.totalQty || strip.quantity || 0,
+    }));
+
+    return {
+        ...strip,
+        timeline,
+        planned_qty: strip.plannedQty || 0,
+        startDate: timeline.length > 0
+            ? `${timeline[0].date} ${timeline[0].shift_start_time}`
+            : null,
+        endDate: timeline.length > 0
+            ? `${timeline[timeline.length - 1].date} ${timeline[timeline.length - 1].shift_end_time}`
+            : null,
+    };
 }

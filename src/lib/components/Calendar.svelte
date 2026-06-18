@@ -720,6 +720,7 @@
              );
             
             selectedTaskForMerge = selectedTaskForContext;
+            const candidates = tasks.filter(t => t.id !== selectedTaskForContext.id);
             mergeCandidates = candidates;
             showMergeModal = true;
         } else if (item.id === 'strip-details' && selectedTaskForContext) {
