@@ -4,36 +4,73 @@ const frappeFetch = async (url, options = {}) => {
 		credentials: 'include',
 		headers: {
 			Accept: 'application/json',
-			...(options.headers || {}),
+			...(options.headers || {})
 		},
-		...options,
+		...options
 	});
 	return response;
 };
 
 const getCsrfToken = () => window.frappe?.csrf_token || '';
 
-export const getFloorLineData = async () => {
-	const url =
-		'/api/method/asl_core.asl_production.doctype.sewing_planning_board_setup.sewing_planning_board_setup.get_floors_and_lines?planning_board_name=Sewing%20Board-MFL-020426-07088';
+export const login = async (usr, pwd) => {
+	const response = await frappeFetch('/api/method/login', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ usr, pwd })
+	});
+	if (!response.ok) {
+		const data = await response.json().catch(() => ({}));
+		throw new Error(data?.message || 'Invalid credentials');
+	}
+	const data = await response.json();
+	return data;
+};
+
+export const logout = async () => {
+	await frappeFetch('/api/method/logout', { method: 'POST' });
+};
+
+export const getLoggedUser = async () => {
+	const response = await frappeFetch('/api/method/frappe.auth.get_logged_user');
+	if (!response.ok) return null;
+	const data = await response.json();
+	return data?.message || null;
+};
+
+export const getPlanningBoards = async () => {
+	const response = await frappeFetch(
+		'/api/method/asl_core.api.external.planning_board.get_planning_boards'
+	);
+	if (!response.ok) return [];
+	const data = await response.json();
+	return data?.message || [];
+};
+
+export const getFloorLineData = async (planningBoard) => {
+	const board = encodeURIComponent(planningBoard || 'Sewing Board-MF-020226-02882');
+	const url = `/api/method/asl_core.asl_production.doctype.sewing_planning_board_setup.sewing_planning_board_setup.get_floors_and_lines?planning_board_name=${board}`;
 	const response = await frappeFetch(url);
 	if (!response.ok) return [];
 	const data = await response.json();
 	return data?.message;
 };
 
-export const getWorkHourData = async (fromDate, toDate) => {
+export const getWorkHourData = async (fromDate, toDate, planningBoard) => {
 	const from_data = fromDate || '2026-02-01';
 	const to_data = toDate || '2026-03-01';
-	const url = `/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours?company=M.I.M%20Fashion%20Wear%20Ltd.&planning_board_name=Sewing%20Board-MFL-020426-07088&from_date=${from_data}&to_date=${to_data}`;
+	const board = encodeURIComponent(planningBoard || 'Sewing Board-MF-020226-02882');
+	const url = `/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours?company=M.I.M%20Fashion%20Wear%20Ltd.&planning_board_name=${board}&from_date=${from_data}&to_date=${to_data}`;
 	const response = await frappeFetch(url);
 	if (!response.ok) return [];
 	const data = await response.json();
 	return data?.message;
 };
 
-export const getStripsWithLearningCurve = async () => {
-	const url = '/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve?planning_board_name=Sewing%20Board-MFL-020426-07088';
+export const getStripsWithLearningCurve = async (planningBoard) => {
+	const board = encodeURIComponent(planningBoard || 'Sewing Board-MF-020226-02882');
+	const url =
+		`/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve?planning_board_name=${board}`;
 	try {
 		const response = await frappeFetch(url);
 		if (!response.ok) {
@@ -69,9 +106,9 @@ const postWithCsrf = async (url, body) => {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			'X-Frappe-CSRF-Token': getCsrfToken(),
+			'X-Frappe-CSRF-Token': getCsrfToken()
 		},
-		body: JSON.stringify(body),
+		body: JSON.stringify(body)
 	});
 	return response;
 };

@@ -5,6 +5,7 @@
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { floor_line_data } from '$lib/stores/data';
+            import { auth } from '$lib/stores/auth.svelte.js';
             import { calculateSingleStripTimeline, calculateStripTimelines, transformStripsToTasks, generateTimeline } from '$lib/utils/taskCalculator';
             import { onMount, getContext } from 'svelte';
             import { slide } from 'svelte/transition';
@@ -60,7 +61,7 @@
 
             const get_floor_line_data = async () => {
                 // get floor line data from API
-                const apiData = await getFloorLineData();
+                const apiData = await getFloorLineData(auth.selectedBoard?.name);
 
                 // If API fails, fallback to store data
                 const data = apiData && apiData.length > 0 ? apiData : floor_line_data;
@@ -454,8 +455,8 @@
 
                 try {
                     const [stripsData, fetchedWorkHours, fetchedShifts] = await Promise.all([
-                        getStripsWithLearningCurve(),
-                        getWorkHourData(startDateStr, endDateStr),
+                        getStripsWithLearningCurve(auth.selectedBoard?.name),
+                        getWorkHourData(startDateStr, endDateStr, auth.selectedBoard?.name),
                         getShiftDetails()
                     ]);
 
