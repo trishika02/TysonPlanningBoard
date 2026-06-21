@@ -93,7 +93,6 @@ export const getFloorLineData = async (planningBoard) => {
 	const response = await frappeFetch(url);
 	if (!response.ok) return [];
 	const data = await response.json();
-	console.log('floor line data', data);
 	return data?.message;
 };
 
@@ -105,7 +104,6 @@ export const getWorkHourData = async (fromDate, toDate, planningBoard) => {
 	const response = await frappeFetch(url);
 	if (!response.ok) return [];
 	const data = await response.json();
-	console.log('work hour data', data);
 	return data?.message;
 };
 
@@ -120,7 +118,6 @@ export const getStripsWithLearningCurve = async (planningBoard) => {
 			return [];
 		}
 		const data = await response.json();
-		console.log('strips data', data);
 		return data?.message || [];
 	} catch (error) {
 		console.error('Error fetching strips data:', error);
@@ -137,7 +134,6 @@ export const getShiftDetails = async () => {
 			return [];
 		}
 		const data = await response.json();
-		console.log('shift details', data);
 		return data?.message || [];
 	} catch (error) {
 		console.error('Error fetching shift details:', error);
