@@ -6,6 +6,7 @@
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { floor_line_data } from '$lib/stores/data';
             import { auth } from '$lib/stores/auth.svelte.js';
+            import { toast, dismiss as dismissToast } from '$lib/stores/toast.svelte.js';
             import { calculateSingleStripTimeline, calculateStripTimelines, transformStripsToTasks, generateTimeline } from '$lib/utils/taskCalculator';
             import { onMount, getContext } from 'svelte';
             import { slide } from 'svelte/transition';
@@ -39,7 +40,6 @@
             
             // Register save function with layout
             const registerSave = getContext('registerSave');
-            const setSaveStatus = getContext('setSaveStatus');
 
             // Group unplanned strips by order for the "Unplanned Orders" panel
             const unplannedOrders = $derived(
@@ -363,8 +363,8 @@
             // === SAVE FUNCTIONALITY ===
             async function saveChanges() {
                 isSaving = true;
-                setSaveStatus('saving', 'Saving changes...');
-                
+                const savingId = toast.info('Saving changes…', 0); // persistent until dismissed
+
                 try {
                     // 1. Map updated strips (moved or resized)
                     const stripsToUpdate = [];
@@ -392,20 +392,16 @@
                         sewingStartDate: formatToERPDateTime(split.sewingStartDate),
                         deliveryDate: formatToERPDateTime(split.deliveryDate)
                     }));
-                    
+
+                    dismissToast(savingId);
+
                     if (stripsToUpdate.length === 0 && formattedSplits.length === 0 && pendingMerges.length === 0) {
-                        setSaveStatus('success', 'No changes to save');
-                        setTimeout(() => setSaveStatus('', ''), 3000);
+                        toast.info('No changes to save');
                         isSaving = false;
                         return;
                     }
 
-                    // --- Consolidated Save Call ---
-                    console.log('Saving to backend:', { 
-                        updates: stripsToUpdate, 
-                        splits: formattedSplits,
-                        merges: pendingMerges
-                    });
+                    console.log('Saving to backend:', { updates: stripsToUpdate, splits: formattedSplits, merges: pendingMerges });
                     const result = await saveTysonChanges({
                         updates: stripsToUpdate,
                         splits: formattedSplits,
@@ -413,24 +409,24 @@
                     });
 
                     if (result.status !== 'success') {
-                        setSaveStatus('error', result.message || 'Failed to save changes');
-                        setTimeout(() => setSaveStatus('', ''), 5000);
+                        toast.error(result.message || 'Failed to save changes');
                         isSaving = false;
                         return;
                     }
 
-                    setSaveStatus('success', `Successfully saved`);
-                    
-                    // Clear tracking buffers
+                    const parts = [];
+                    if (stripsToUpdate.length) parts.push(`${stripsToUpdate.length} strip${stripsToUpdate.length > 1 ? 's' : ''} updated`);
+                    if (formattedSplits.length) parts.push(`${formattedSplits.length} split${formattedSplits.length > 1 ? 's' : ''}`);
+                    if (pendingMerges.length) parts.push(`${pendingMerges.length} merge${pendingMerges.length > 1 ? 's' : ''}`);
+                    toast.success(parts.join(', ') + ' saved successfully');
+
                     pendingUpdates.clear();
                     pendingSplits = [];
                     pendingMerges = [];
-                    
-                    setTimeout(() => setSaveStatus('', ''), 5000);
                 } catch (error) {
                     console.error('Error saving changes:', error);
-                    setSaveStatus('error', 'Error saving changes: ' + error.message);
-                    setTimeout(() => setSaveStatus('', ''), 5000);
+                    dismissToast(savingId);
+                    toast.error('Save failed: ' + error.message);
                 } finally {
                     isSaving = false;
                 }

@@ -3,6 +3,8 @@
 	import '../app.css';
 	import { auth } from '$lib/stores/auth.svelte.js';
 	import { getLoggedUser, getPlanningBoards, logout } from '$lib/api-call.js';
+	import { toast } from '$lib/stores/toast.svelte.js';
+	import Toast from '$lib/components/Toast.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount, setContext } from 'svelte';
@@ -11,18 +13,11 @@
 
 	// Save function context
 	let onSave = $state(() => {});
-	let saveStatus = $state('');
-	let saveMessage = $state('');
 
 	function handleSave() { onSave(); }
 	function registerSave(fn) { onSave = fn; }
-	function setSaveStatus(status, message) {
-		saveStatus = status;
-		saveMessage = message;
-	}
 
 	setContext('registerSave', registerSave);
-	setContext('setSaveStatus', setSaveStatus);
 	setContext('getSelectedBoard', () => auth.selectedBoard);
 
 	const isLoginPage = $derived(page.url.pathname === '/login');
@@ -31,9 +26,15 @@
 	let showBoardSelector = $state(false);
 
 	function selectBoard(board) {
+		const prev = auth.selectedBoard?.name;
 		auth.selectedBoard = board;
 		sessionStorage.setItem('selectedBoard', JSON.stringify(board));
 		showBoardSelector = false;
+		if (prev && prev !== board.name) {
+			toast.info(`Switched to ${board.name}`);
+		} else if (!prev) {
+			toast.success(`Board loaded: ${board.name}`);
+		}
 	}
 
 	async function handleLogout() {
@@ -136,43 +137,14 @@
 			</div>
 		</nav>
 
-		<!-- Save Status Notification -->
-		{#if saveStatus}
-			<div class="fixed top-20 right-8 z-50 px-6 py-3 rounded-lg shadow-lg transition-all text-white"
-			     class:bg-green-500={saveStatus === 'success'}
-			     class:bg-red-500={saveStatus === 'error'}
-			     class:bg-blue-500={saveStatus === 'saving'}>
-				{#if saveStatus === 'saving'}
-					<div class="flex items-center gap-2">
-						<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018 8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-						</svg>
-						<span>{saveMessage}</span>
-					</div>
-				{:else}
-					<div class="flex items-center gap-2">
-						{#if saveStatus === 'success'}
-							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-							</svg>
-						{:else}
-							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-							</svg>
-						{/if}
-						<span>{saveMessage}</span>
-					</div>
-				{/if}
-			</div>
-		{/if}
-
 		<!-- Main Application Body -->
 		<div class="w-[90%] bg-white rounded-xl shadow-lg border border-gray-200 flex-1 flex flex-col overflow-hidden mb-8 h-[80vh]">
 			{@render children()}
 		</div>
 
 	</div>
+
+	<Toast />
 
 	<!-- Board Selector Modal -->
 	{#if !auth.selectedBoard || showBoardSelector}
