@@ -78,6 +78,16 @@ export const getLoggedUser = async () => {
 	return data?.message || null;
 };
 
+export const getWorkHourDateRange = async (planningBoard) => {
+	const board = encodeURIComponent(planningBoard);
+	const response = await frappeFetch(
+		`/api/method/asl_core.api.external.planning_board.get_work_hour_date_range?planning_board_name=${board}`
+	);
+	if (!response.ok) return null;
+	const data = await response.json();
+	return data?.message || null;
+};
+
 export const getPlanningBoards = async () => {
 	const response = await frappeFetch(
 		'/api/method/asl_core.api.external.planning_board.get_planning_boards'

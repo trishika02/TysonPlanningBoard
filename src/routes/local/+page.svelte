@@ -1,6 +1,6 @@
         
         <script>
-            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getShiftDetails, updateStripsFromTyson, saveTysonChanges, fetchAndSetCsrfToken} from '$lib/api-call';
+            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getWorkHourDateRange, getShiftDetails, updateStripsFromTyson, saveTysonChanges, fetchAndSetCsrfToken} from '$lib/api-call';
             import Calendar from '$lib/components/Calendar.svelte';
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
@@ -17,6 +17,7 @@
             let tasks = $state([]);
             let lines = $state([]);
             let workHoursData = $state([]); // Store work hours for recalculation
+            let workHourDateRange = $state(null); // { from_date, to_date } from backend
             let shiftMap = $state({}); // Map of shift name → shift detail object
             let showUnplanned = $state(false); // State for toggling unplanned panel
             let showUnplanned2 = $state(false); // State for toggling second unplanned panel
@@ -39,6 +40,27 @@
             // Register save function with layout
             const registerSave = getContext('registerSave');
             const setSaveStatus = getContext('setSaveStatus');
+
+            // Group unplanned strips by order for the "Unplanned Orders" panel
+            const unplannedOrders = $derived(
+                Object.values(
+                    unplannedTasks.reduce((acc, task) => {
+                        const key = task.orderId || '—';
+                        if (!acc[key]) {
+                            acc[key] = {
+                                orderId: key,
+                                style: task.style,
+                                customer: task.customer || '',
+                                totalQty: 0,
+                                stripCount: 0
+                            };
+                        }
+                        acc[key].totalQty += task.quantity || 0;
+                        acc[key].stripCount += 1;
+                        return acc;
+                    }, {})
+                ).sort((a, b) => a.orderId.localeCompare(b.orderId))
+            );
             
             // === 2. MOCK DATA & CONSTANTS ===
 
@@ -59,9 +81,9 @@
 // 	}
 // ];
 
-            const get_floor_line_data = async () => {
+            const get_floor_line_data = async (boardName) => {
                 // get floor line data from API
-                const apiData = await getFloorLineData(auth.selectedBoard?.name);
+                const apiData = await getFloorLineData(boardName);
 
                 // If API fails, fallback to store data
                 const data = apiData && apiData.length > 0 ? apiData : floor_line_data;
@@ -414,31 +436,31 @@
                 }
             }
 
-            onMount(async () => {
-                // Fetch CSRF token first
-                await fetchAndSetCsrfToken();
-                
-                // Register save function with layout
-                registerSave(saveChanges);
-                
-                // Fetch floor and line data from API
+            async function loadBoardData(boardName) {
+                // Reset state so stale data from previous board is cleared immediately
+                MOCK_FLOORS_LINES = [];
+                tasks = [];
+                unplannedTasks = [];
+                lines = [];
+                workHoursData = [];
+                workHourDateRange = null;
+                shiftMap = {};
+                pendingUpdates = new Set();
+                pendingSplits = [];
+                pendingMerges = [];
+
                 try {
-                    const floorData = await get_floor_line_data();
-                    if (floorData && floorData.length > 0) {
-                        MOCK_FLOORS_LINES = floorData;
-                    } else {
-                        MOCK_FLOORS_LINES = test_floor_lines;
-                    }
+                    const floorData = await get_floor_line_data(boardName);
+                    MOCK_FLOORS_LINES = (floorData && floorData.length > 0) ? floorData : test_floor_lines;
                 } catch (error) {
                     console.error('Failed to fetch floor/line data:', error);
                     MOCK_FLOORS_LINES = test_floor_lines;
                 }
 
-                // Init state: Flatten Floors into a single list of rows for Calendar
                 let flatRows = [];
                 for (const floor of MOCK_FLOORS_LINES) {
                     for (const line of floor.lines) {
-                         flatRows.push({
+                        flatRows.push({
                             id: line.id,
                             name: line.name,
                             type: 'line',
@@ -447,26 +469,25 @@
                         });
                     }
                 }
-
                 lines = flatRows;
 
-                // Fetch strips, work hours, and shift details in parallel
-                const startDateStr = today.toISOString().split('T')[0];
-                const endDateObj = new Date(today);
-                endDateObj.setDate(endDateObj.getDate() + 30);
-                const endDateStr = endDateObj.toISOString().split('T')[0];
-
                 try {
-                    const [stripsData, fetchedWorkHours, fetchedShifts] = await Promise.all([
-                        getStripsWithLearningCurve(auth.selectedBoard?.name),
-                        getWorkHourData(startDateStr, endDateStr, auth.selectedBoard?.name),
+                    const [dateRange, stripsData, fetchedShifts] = await Promise.all([
+                        getWorkHourDateRange(boardName),
+                        getStripsWithLearningCurve(boardName),
                         getShiftDetails()
                     ]);
 
-                    // Store work hours for later recalculation
+                    workHourDateRange = dateRange;
+                    const startDateStr = dateRange?.from_date || today.toISOString().split('T')[0];
+                    const endDateStr = dateRange?.to_date || (() => {
+                        const d = new Date(today); d.setDate(d.getDate() + 90);
+                        return d.toISOString().split('T')[0];
+                    })();
+
+                    const fetchedWorkHours = await getWorkHourData(startDateStr, endDateStr, boardName);
                     workHoursData = fetchedWorkHours || [];
 
-                    // Build shift lookup map
                     if (fetchedShifts && fetchedShifts.length > 0) {
                         fetchedShifts.forEach((s) => { shiftMap[s.name] = s; });
                     } else {
@@ -474,14 +495,8 @@
                     }
 
                     if (stripsData && stripsData.length > 0) {
-                        const stripsWithTimelines = calculateStripTimelines(
-                            stripsData,
-                            workHoursData,
-                            shiftMap
-                        );
-
+                        const stripsWithTimelines = calculateStripTimelines(stripsData, workHoursData, shiftMap);
                         const { planned, unplanned } = transformStripsToTasks(stripsWithTimelines);
-
                         tasks = planned;
                         unplannedTasks = unplanned;
                     } else {
@@ -494,18 +509,30 @@
                     tasks = [...MOCK_TASKS];
                     unplannedTasks = [];
                 }
+            }
+
+            onMount(async () => {
+                await fetchAndSetCsrfToken();
+                registerSave(saveChanges);
+            });
+
+            $effect(() => {
+                const boardName = auth.selectedBoard?.name;
+                if (!boardName) return;
+                loadBoardData(boardName);
             });
         </script>
 
     <div id="app" class="flex h-screen w-full overflow-hidden">
         <!-- === Left Sticky Sidebar (Line Names) === -->
-        <Sidebar 
+        <Sidebar
             bind:this={sidebar}
             floors={MOCK_FLOORS_LINES}
-            {lines} 
-            rowHeight={ROW_HEIGHT} 
-            onDateChange={handleDateChange} 
-            onResetDate={handleResetDate} 
+            {lines}
+            rowHeight={ROW_HEIGHT}
+            onDateChange={handleDateChange}
+            onResetDate={handleResetDate}
+            dateRange={workHourDateRange}
         />
 
         <!-- === Main Content (Scrollable Calendar) === -->
@@ -716,24 +743,32 @@
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
                             <tr>
-                                <th class="px-4 py-2 w-10"></th> <!-- Drag Handle Column -->
                                 <th class="px-4 py-2">Order</th>
                                 <th class="px-4 py-2">Style</th>
-                                <th class="px-4 py-2 text-right">Qty</th>
+                                <th class="px-4 py-2">Customer</th>
+                                <th class="px-4 py-2 text-center">Strips</th>
+                                <th class="px-4 py-2 text-right">Total Qty</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Placeholder Rows -->
-                            {#each Array(5) as _, i}
+                            {#each unplannedOrders as order (order.orderId)}
                                 <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td class="px-4 py-2 text-center text-gray-400">-</td>
-                                    <td class="px-4 py-2 text-gray-400 italic">Order #{i + 1}</td>
-                                    <td class="px-4 py-2 text-gray-400 italic">Style #{i + 1}</td>
-                                    <td class="px-4 py-2 text-right text-gray-400">{(i + 1) * 1000}</td>
+                                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-white select-none">{order.orderId}</td>
+                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300 select-none">{order.style}</td>
+                                    <td class="px-4 py-2 text-gray-500 dark:text-gray-400 select-none text-xs">{order.customer}</td>
+                                    <td class="px-4 py-2 text-center">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                                            {order.stripCount}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2 text-right font-mono select-none">{order.totalQty.toLocaleString()}</td>
                                 </tr>
                             {/each}
                         </tbody>
                     </table>
+                    {#if unplannedOrders.length === 0}
+                        <div class="p-8 text-center text-gray-400 text-sm">No unplanned orders</div>
+                    {/if}
                 </div>
             </div>
         </div>

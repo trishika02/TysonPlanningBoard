@@ -1,0 +1,122 @@
+@baseUrl = http://127.0.0.1:8000
+@planningBoard = Sewing%20Board-MF-020226-02882
+@company = M.I.M%20Fashion%20Wear%20Ltd.
+@csrfToken =
+
+# ─── Auth ───────────────────────────────────────────────────────────────────
+
+### Login
+POST {{baseUrl}}/api/method/login
+Content-Type: application/json
+
+{
+    "usr": "Administrator",
+    "pwd": "123456"
+}
+
+### Logout
+POST {{baseUrl}}/api/method/logout
+
+### Get Logged User
+GET {{baseUrl}}/api/method/frappe.auth.get_logged_user
+
+### Get CSRF Token
+GET {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.get_csrf_token
+
+# ─── Planning Boards ─────────────────────────────────────────────────────────
+
+### Get All Planning Boards
+GET {{baseUrl}}/api/method/asl_core.api.external.planning_board.get_planning_boards
+
+### Get Planning Boards (by company)
+GET {{baseUrl}}/api/method/asl_core.api.external.planning_board.get_planning_boards?company={{company}}
+
+### Get Work Hour Date Range
+GET {{baseUrl}}/api/method/asl_core.api.external.planning_board.get_work_hour_date_range?planning_board_name={{planningBoard}}
+
+# ─── Floors & Lines ──────────────────────────────────────────────────────────
+
+### Get Floors and Lines
+GET {{baseUrl}}/api/method/asl_core.asl_production.doctype.sewing_planning_board_setup.sewing_planning_board_setup.get_floors_and_lines?planning_board_name={{planningBoard}}
+
+### Get Floor Details
+GET {{baseUrl}}/api/method/asl_core.api.external.setup.get_floor_details
+
+### Get Line Details
+GET {{baseUrl}}/api/method/asl_core.api.external.setup.get_line_details
+
+### Get Line Details (by floor)
+GET {{baseUrl}}/api/method/asl_core.api.external.setup.get_line_details?floor_id=1
+
+# ─── Work Hours ──────────────────────────────────────────────────────────────
+
+### Get Daily Work Hours
+GET {{baseUrl}}/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours?company={{company}}&planning_board_name={{planningBoard}}&from_date=2026-04-28&to_date=2026-12-31
+
+# ─── Shifts ──────────────────────────────────────────────────────────────────
+
+### Get All Shift Details
+GET {{baseUrl}}/api/method/asl_core.api.external.shift.get_shift_details
+
+### Get Specific Shift Details
+GET {{baseUrl}}/api/method/asl_core.api.external.shift.get_shift_details?shift_name=General
+
+# ─── Strips ──────────────────────────────────────────────────────────────────
+
+### Get Strips with Learning Curve
+GET {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve?planning_board_name={{planningBoard}}
+
+### Get Overlapping Intervals
+POST {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.get_overlapping_intervals
+Content-Type: application/json
+X-Frappe-CSRF-Token: {{csrfToken}}
+
+{
+    "doc": "{}"
+}
+
+### Merge Strip
+POST {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.merge_strip
+Content-Type: application/json
+X-Frappe-CSRF-Token: {{csrfToken}}
+
+{
+    "source_name": "STRIP-0001"
+}
+
+### Update Merged Strips
+POST {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.update_merged_strips
+Content-Type: application/json
+X-Frappe-CSRF-Token: {{csrfToken}}
+
+{
+    "merged_strips_json": "[]",
+    "merged_with_json": "[]"
+}
+
+### Freeze Form
+POST {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.freeze_form
+Content-Type: application/json
+X-Frappe-CSRF-Token: {{csrfToken}}
+
+{
+    "doc": "{}"
+}
+
+### Update Strips from Tyson
+POST {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.update_strips_from_tyson
+Content-Type: application/json
+X-Frappe-CSRF-Token: {{csrfToken}}
+
+{
+    "data": "[]"
+}
+
+### Save Tyson Changes
+POST {{baseUrl}}/api/method/asl_core.asl_production.doctype.strip.strip.save_tyson_changes
+Content-Type: application/json
+X-Frappe-CSRF-Token: {{csrfToken}}
+
+{
+    "data": "{\"updates\": [], \"splits\": [], \"merges\": []}"
+}

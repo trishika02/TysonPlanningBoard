@@ -1160,6 +1160,31 @@
             calendarDates.appendChild(dateEl);
         });
 
+        // Render Work Hours Summary Row
+        const workHoursRow = document.getElementById('calendar-work-hours');
+        if (workHoursRow) {
+            workHoursRow.innerHTML = '';
+            const whFrag = document.createDocumentFragment();
+            calendarDays.forEach((day) => {
+                const totalHrs = day.isBlocked
+                    ? 0
+                    : lines.reduce((sum, line) => sum + getLineWorkHours(day.date, line.id, day.isBlocked), 0);
+
+                const cell = document.createElement('div');
+                cell.className = `flex-shrink-0 border-r border-gray-200 flex items-center justify-center ${day.isBlocked ? 'bg-gray-50' : 'bg-indigo-50'}`;
+                cell.style.width = `${dayColumnWidth}px`;
+                cell.style.height = '100%';
+
+                if (totalHrs > 0) {
+                    cell.innerHTML = `<span class="text-[10px] font-semibold text-indigo-600">${totalHrs}h</span>`;
+                } else {
+                    cell.innerHTML = `<span class="text-[10px] text-gray-300">—</span>`;
+                }
+                whFrag.appendChild(cell);
+            });
+            workHoursRow.appendChild(whFrag);
+        }
+
         // Render Grid Background Cells
         if (gridBackgroundLayer) {
             let gridCellsFrag = document.createDocumentFragment();
@@ -1382,12 +1407,16 @@
         <span class="font-bold text-lg tracking-wide">{currentVisibleMonth || 'Loading...'}</span>
     </div>
     
-    <!-- Calendar Header (Dates) -->
-    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow z-10 h-14 overflow-hidden">
-        <div class="flex h-full w-max">
+    <!-- Calendar Header (Dates + Work Hours) -->
+    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow z-10 overflow-hidden" style="height: 76px;">
+        <div class="flex flex-col w-max">
             <!-- Dates Row -->
-            <div id="calendar-dates" class="flex h-14">
-                 <!-- JS Injected -->
+            <div id="calendar-dates" class="flex" style="height: 48px;">
+                <!-- JS Injected -->
+            </div>
+            <!-- Total Work Hours Row -->
+            <div id="calendar-work-hours" class="flex border-t border-indigo-100" style="height: 28px;">
+                <!-- JS Injected -->
             </div>
         </div>
     </div>

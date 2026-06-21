@@ -1,11 +1,18 @@
 <script>
-    let { 
-        floors = [], 
-        lines = [], // Fallback/Unused now but kept for prop safety if needed
+    let {
+        floors = [],
+        lines = [],
         rowHeight = 36,
         onDateChange = () => {},
-        onResetDate = () => {}
+        onResetDate = () => {},
+        dateRange = null // { from_date: 'YYYY-MM-DD', to_date: 'YYYY-MM-DD' }
     } = $props();
+
+    function formatMonth(dateStr) {
+        if (!dateStr) return '—';
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
 
     let dateValue = $state('');
     let sidebarRows; // Reference to the rows container
@@ -57,9 +64,16 @@
             </div>
         </div>
 
-        <!-- ROW 2 (Middle): Date Range Label -->
-        <div class="h-12 w-full border-b border-gray-200 flex items-center justify-center bg-gray-50/50">
-            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Date Range</span>
+        <!-- ROW 2 (Middle): Work Hours Date Range -->
+        <div class="h-12 w-full border-b border-gray-200 flex flex-col items-center justify-center bg-gray-50/50 px-2">
+            {#if dateRange}
+                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Work Hours Period</span>
+                <span class="text-xs font-semibold text-indigo-600 text-center leading-tight">
+                    {formatMonth(dateRange.from_date)} — {formatMonth(dateRange.to_date)}
+                </span>
+            {:else}
+                <span class="text-xs font-bold text-gray-300 uppercase tracking-widest">Loading...</span>
+            {/if}
         </div>
 
         <!-- ROW 3 (Bottom): Titles (Floor | Lines) -->
