@@ -1,6 +1,6 @@
         
         <script>
-            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getShiftDetails, updateStripsFromTyson, saveTysonChanges} from '$lib/api-call';
+            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getShiftDetails, updateStripsFromTyson, saveTysonChanges, fetchAndSetCsrfToken} from '$lib/api-call';
             import Calendar from '$lib/components/Calendar.svelte';
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
@@ -415,6 +415,9 @@
             }
 
             onMount(async () => {
+                // Fetch CSRF token first
+                await fetchAndSetCsrfToken();
+                
                 // Register save function with layout
                 registerSave(saveChanges);
                 

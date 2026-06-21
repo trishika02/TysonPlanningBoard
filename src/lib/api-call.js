@@ -1,3 +1,6 @@
+// CSRF token storage
+let csrfToken = null;
+
 const frappeFetch = async (url, options = {}) => {
 	const response = await fetch(url, {
 		mode: 'same-origin',
@@ -11,7 +14,37 @@ const frappeFetch = async (url, options = {}) => {
 	return response;
 };
 
-const getCsrfToken = () => window.frappe?.csrf_token || '';
+const getCsrfToken = () => {
+	// Try window.frappe first for backward compatibility
+	if (window.frappe?.csrf_token) {
+		return window.frappe.csrf_token;
+	}
+	// Otherwise return the cached token
+	return csrfToken || '';
+};
+
+export const fetchAndSetCsrfToken = async () => {
+	try {
+		const response = await frappeFetch(
+			'/api/method/asl_core.asl_production.doctype.strip.strip.get_csrf_token'
+		);
+		if (!response.ok) {
+			console.error('Failed to fetch CSRF token');
+			return false;
+		}
+		const data = await response.json();
+		csrfToken = data?.message || '';
+		// Also set it on window.frappe for consistency
+		if (window.frappe) {
+			window.frappe.csrf_token = csrfToken;
+		}
+		console.log('CSRF token fetched successfully');
+		return true;
+	} catch (error) {
+		console.error('Error fetching CSRF token:', error);
+		return false;
+	}
+};
 
 export const login = async (usr, pwd) => {
 	const response = await frappeFetch('/api/method/login', {
@@ -24,11 +57,18 @@ export const login = async (usr, pwd) => {
 		throw new Error(data?.message || 'Invalid credentials');
 	}
 	const data = await response.json();
+	// After successful login, fetch the CSRF token
+	await fetchAndSetCsrfToken();
 	return data;
 };
 
 export const logout = async () => {
 	await frappeFetch('/api/method/logout', { method: 'POST' });
+	// Clear CSRF token on logout
+	csrfToken = null;
+	if (window.frappe) {
+		window.frappe.csrf_token = null;
+	}
 };
 
 export const getLoggedUser = async () => {
@@ -53,6 +93,7 @@ export const getFloorLineData = async (planningBoard) => {
 	const response = await frappeFetch(url);
 	if (!response.ok) return [];
 	const data = await response.json();
+	console.log('floor line data', data);
 	return data?.message;
 };
 
@@ -64,6 +105,7 @@ export const getWorkHourData = async (fromDate, toDate, planningBoard) => {
 	const response = await frappeFetch(url);
 	if (!response.ok) return [];
 	const data = await response.json();
+	console.log('work hour data', data);
 	return data?.message;
 };
 
@@ -78,6 +120,7 @@ export const getStripsWithLearningCurve = async (planningBoard) => {
 			return [];
 		}
 		const data = await response.json();
+		console.log('strips data', data);
 		return data?.message || [];
 	} catch (error) {
 		console.error('Error fetching strips data:', error);
@@ -94,6 +137,7 @@ export const getShiftDetails = async () => {
 			return [];
 		}
 		const data = await response.json();
+		console.log('shift details', data);
 		return data?.message || [];
 	} catch (error) {
 		console.error('Error fetching shift details:', error);
