@@ -43,16 +43,6 @@
     }
 
 
-    function handleSegmentEnter(e, segment) {
-        e.stopPropagation();
-        const content = `
-            <strong>Segment:</strong> ${segment.qty} units<br>
-            <strong>Progress:</strong> ${Math.round((segment.qty / task.quantity) * 100)}%<br>
-            <span class="text-xs text-gray-400">Color: ${segment.color}</span>
-        `;
-        tooltipStore.show(e.pageX, e.pageY, content);
-    }
-
     function handleRemainingEnter(e) {
         const startStr = formatDate(new Date(task.start), 'YYYY-MM-DD HH:mm');
         const endStr = formatDate(new Date(task.end), 'YYYY-MM-DD HH:mm');
@@ -178,22 +168,16 @@
         <div class="absolute inset-0 w-full h-full flex overflow-hidden pointer-events-none">
             {#each task.completed_segments as segment}
                 <div 
-                    class="{segment.color} h-full opacity-90 border-r border-white/10 hover:opacity-100 transition-opacity pointer-events-auto"
+                    class="{segment.color} h-full opacity-90 border-r border-white/10 hover:opacity-100 transition-opacity pointer-events-none"
                     style="width: {(segment.qty / task.quantity) * 100}%;"
-                    onmouseenter={(e) => handleSegmentEnter(e, segment)}
-                    onmousemove={handleMouseMove}
-                    onmouseleave={handleMouseLeave}
                 ></div>
             {/each}
         </div>
     {:else if quantityPercent !== null}
         <!-- Fallback for single segment if no segments defined -->
         <div 
-            class="absolute inset-0 h-full bg-green-500/80 hover:bg-green-500 transition-colors pointer-events-auto"
+            class="absolute inset-0 h-full bg-green-500/80 hover:bg-green-500 transition-colors pointer-events-none"
             style="width: {quantityPercent}%;"
-            onmouseenter={(e) => handleSegmentEnter(e, { qty: task.completed_quantity, color: 'bg-green-500' })}
-            onmousemove={handleMouseMove}
-            onmouseleave={handleMouseLeave}
         ></div>
     {/if}
 
