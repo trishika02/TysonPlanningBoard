@@ -92,6 +92,57 @@
         renderBoard();
     }
 
+    // Scroll the calendar so a given task is visible and centred horizontally
+    export async function scrollToTask(taskId) {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task || !task.start) return;
+
+        const taskStart = new Date(task.start);
+        const calStart = new Date(today);
+        calStart.setHours(0, 0, 0, 0);
+        calStart.setDate(calStart.getDate() - daysBefore);
+
+        const calEnd = new Date(today);
+        calEnd.setHours(0, 0, 0, 0);
+        calEnd.setDate(calEnd.getDate() + daysAfter);
+
+        // Expand range if the task start is outside the current calendar window
+        let needsRender = false;
+        if (taskStart < calStart) {
+            const diffDays = Math.ceil((calStart - taskStart) / (1000 * 60 * 60 * 24));
+            daysBefore += diffDays + 7; // extra buffer
+            needsRender = true;
+        } else if (taskStart > calEnd) {
+            const diffDays = Math.ceil((taskStart - calEnd) / (1000 * 60 * 60 * 24));
+            daysAfter += diffDays + 7;
+            needsRender = true;
+        }
+
+        if (needsRender) {
+            renderBoard();
+            await tick();
+        }
+
+        const body = document.getElementById('calendar-body');
+        if (!body) return;
+
+        const xOffset = getPixelOffsetForDate(taskStart, task.lineId);
+        const lineIndex = lines.findIndex(l => l.id === task.lineId);
+        const yOffset = lineIndex >= 0 ? lineIndex * ROW_HEIGHT : 0;
+
+        // Centre the task horizontally in the viewport
+        const centredX = xOffset - body.clientWidth / 2 + dayColumnWidth;
+        body.scrollTo({ left: Math.max(0, centredX), top: yOffset, behavior: 'smooth' });
+
+        // Flash highlight via a temporary class on the task DOM node
+        await tick();
+        const taskEl = body.querySelector(`[data-task-id="${taskId}"]`);
+        if (taskEl) {
+            taskEl.classList.add('task-highlight-flash');
+            setTimeout(() => taskEl.classList.remove('task-highlight-flash'), 1800);
+        }
+    }
+
     // Drag & Drop State
     let draggedTaskId = null;
     let isDragging = $state(false); // Reactive state for drag status
@@ -125,6 +176,10 @@
     let mergeCandidates = $state([]);
     let showStripDetailsModal = $state(false);
     let selectedTaskForDetails = $state(null);
+    let showDateTimeModal = $state(false);
+    let selectedTaskForDateTime = $state(null);
+    let dateTimeModalValue = $state(''); // YYYY-MM-DD
+    let dateTimeTimeValue = $state('08:00'); // HH:MM
 
     // Helpers
     function getStandardWorkHours(dayOfWeek) {
@@ -726,6 +781,19 @@
         } else if (item.id === 'strip-details' && selectedTaskForContext) {
             selectedTaskForDetails = selectedTaskForContext;
             showStripDetailsModal = true;
+        } else if (item.id === 'update-datetime' && selectedTaskForContext) {
+            selectedTaskForDateTime = selectedTaskForContext;
+            if (selectedTaskForContext.start) {
+                const d = new Date(selectedTaskForContext.start);
+                dateTimeModalValue = selectedTaskForContext.start.slice(0, 10);
+                const hh = String(d.getHours()).padStart(2, '0');
+                const mm = String(d.getMinutes()).padStart(2, '0');
+                dateTimeTimeValue = `${hh}:${mm}`;
+            } else {
+                dateTimeModalValue = '';
+                dateTimeTimeValue = '08:00';
+            }
+            showDateTimeModal = true;
         }
         showContextMenu = false;
     }
@@ -733,6 +801,35 @@
     function handleContextMenuClose() {
         showContextMenu = false;
         selectedTaskForContext = null;
+    }
+
+    function applyDateTimeChange() {
+        if (!selectedTaskForDateTime || !dateTimeModalValue) return;
+        const task = tasks.find(t => t.id === selectedTaskForDateTime.id);
+        if (!task) return;
+
+        const timeStr = dateTimeTimeValue || '00:00';
+        const newStart = new Date(`${dateTimeModalValue}T${timeStr}:00`);
+        if (isNaN(newStart.getTime())) return;
+
+        if (recalculateTask) {
+            const result = recalculateTask(task, newStart, task.lineId);
+            task.start = result.start;
+            task.end = result.end;
+            task.timeline = result.timeline;
+            task.total_days = result.total_days;
+        } else {
+            // Fallback: shift the end date by the same offset
+            const oldStart = new Date(task.start);
+            const delta = newStart - oldStart;
+            const newEnd = new Date(new Date(task.end).getTime() + delta);
+            task.start = newStart.toISOString();
+            task.end = newEnd.toISOString();
+        }
+
+        pendingUpdates.add(task.id);
+        showDateTimeModal = false;
+        selectedTaskForDateTime = null;
     }
 
     function handleSplitTask({ splitQuantity }) {
@@ -1519,7 +1616,8 @@
         menuItems={[
             { id: 'split', label: 'Split Task', icon: '✂️' },
             { id: 'merge', label: 'Merge Task', icon: '🔗' },
-            { id: 'strip-details', label: 'Strip Details', icon: '📋' }
+            { id: 'strip-details', label: 'Strip Details', icon: '📋' },
+            { id: 'update-datetime', label: selectedTaskForContext?.start ? 'Update Date & Time' : 'Select Date & Time', icon: '📅' }
         ]}
         onItemClick={handleContextMenuItemClick}
         onClose={handleContextMenuClose}
@@ -1548,11 +1646,78 @@
         task={selectedTaskForDetails}
         onClose={() => { showStripDetailsModal = false; selectedTaskForDetails = null; }}
     />
+
+    <!-- Update Date & Time Modal -->
+    {#if showDateTimeModal && selectedTaskForDateTime}
+        <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-10000 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+                <div class="px-6 pt-6 pb-4">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-semibold text-gray-900">
+                                {selectedTaskForDateTime.start ? 'Update Date & Time' : 'Select Date & Time'}
+                            </h2>
+                            <p class="text-xs text-gray-500 mt-0.5">{selectedTaskForDateTime.orderId} · {selectedTaskForDateTime.style}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
+                            <input
+                                type="date"
+                                bind:value={dateTimeModalValue}
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+                        <div class="w-32">
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Time</label>
+                            <input
+                                type="time"
+                                bind:value={dateTimeTimeValue}
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">The end date will be recalculated based on quantity and line efficiency.</p>
+                </div>
+                <div class="px-6 pb-6 flex gap-3">
+                    <button
+                        onclick={() => { showDateTimeModal = false; selectedTaskForDateTime = null; }}
+                        class="flex-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 py-2.5 rounded-xl transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onclick={applyDateTimeChange}
+                        disabled={!dateTimeModalValue}
+                        class="flex-1 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                        Apply
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
 </div>
 
 <style>
     /* During drag, disable pointer-events on all tasks so drag/drop events reach grid cells */
     :global(#tasks-layer.drag-active .task) {
         pointer-events: none !important;
+    }
+
+    :global(.task-highlight-flash) {
+        animation: highlightPulse 1.8s ease-out forwards;
+    }
+    @keyframes highlightPulse {
+        0%   { outline: 3px solid #fbbf24; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(251,191,36,0.5); }
+        60%  { outline: 3px solid #fbbf24; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(251,191,36,0.5); }
+        100% { outline: 3px solid transparent; box-shadow: none; }
     }
 </style>

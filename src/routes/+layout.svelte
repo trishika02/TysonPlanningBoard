@@ -1,13 +1,13 @@
 <script>
-	import favicon from '$lib/assets/favicon.svg';
-	import '../app.css';
-	import { auth } from '$lib/stores/auth.svelte.js';
-	import { getLoggedUser, getPlanningBoards, logout } from '$lib/api-call.js';
-	import { toast } from '$lib/stores/toast.svelte.js';
-	import Toast from '$lib/components/Toast.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { getLoggedUser, getPlanningBoards, logout } from '$lib/api-call.js';
+	import favicon from '$lib/assets/favicon.svg';
+	import Toast from '$lib/components/Toast.svelte';
+	import { auth } from '$lib/stores/auth.svelte.js';
+	import { toast } from '$lib/stores/toast.svelte.js';
 	import { onMount, setContext } from 'svelte';
+	import '../app.css';
 
 	let { children } = $props();
 
@@ -21,6 +21,13 @@
 	setContext('getSelectedBoard', () => auth.selectedBoard);
 
 	const isLoginPage = $derived(page.url.pathname === '/login');
+
+	// Redirect authenticated users away from /login (handles both SPA nav and hard refresh)
+	$effect(() => {
+		if (isLoginPage && auth.user && !auth.isLoading) {
+			goto('/local');
+		}
+	});
 
 	// Board selector state
 	let showBoardSelector = $state(false);
@@ -50,14 +57,12 @@
 	}
 
 	onMount(async () => {
-		if (page.url.pathname === '/login') {
-			auth.isLoading = false;
-			return;
-		}
-
 		const user = await getLoggedUser();
+
 		if (!user || user === 'Guest') {
-			goto('/login');
+			// Not authenticated — allow the login page, redirect everything else
+			auth.isLoading = false;
+			if (page.url.pathname !== '/login') goto('/login');
 			return;
 		}
 
@@ -114,9 +119,7 @@
 					>
 						<span class="text-xs text-gray-400">Board:</span>
 						<span>{auth.selectedBoard.name}</span>
-						<svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-						</svg>
+					
 					</button>
 				{/if}
 

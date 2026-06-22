@@ -22,10 +22,13 @@
             let shiftMap = $state({}); // Map of shift name → shift detail object
             let showUnplanned = $state(false); // State for toggling unplanned panel
             let showUnplanned2 = $state(false); // State for toggling second unplanned panel
+            let showPlanned = $state(false); // State for toggling planned strips panel
             /** Dragged position for Unplanned panel (null = use default centered position) */
             let unplannedPanelPos = $state(null);
             /** Dragged position for Unplanned Strip 2 panel */
             let unplannedPanel2Pos = $state(null);
+            /** Dragged position for Planned Strips panel */
+            let plannedPanelPos = $state(null);
             /** When dragging the panel by its header: { panel, startX, startY, startLeft, startTop } */
             let panelDragState = $state(null);
             let sidebar; // Sidebar instance binding
@@ -320,8 +323,10 @@
                 const top = panelDragState.startTop + dy;
                 if (panelDragState.panel === 'unplanned') {
                     unplannedPanelPos = { left, top };
-                } else {
+                } else if (panelDragState.panel === 'unplanned2') {
                     unplannedPanel2Pos = { left, top };
+                } else {
+                    plannedPanelPos = { left, top };
                 }
             }
 
@@ -619,18 +624,25 @@
     <!-- Floating Button at Bottom Center (offset for sidebar) -->
     <!-- Floating Buttons at Bottom Center (offset for sidebar) -->
     <div class="fixed bottom-12 z-50 flex gap-4" style="left: calc(50% + 8rem); transform: translateX(-50%);">
-        <button 
+        <button
             class="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-700 transition-all font-medium"
-            onclick={() => { showUnplanned = !showUnplanned; if (showUnplanned) { showUnplanned2 = false; unplannedPanel2Pos = null; } }}
+            onclick={() => { showUnplanned = !showUnplanned; if (showUnplanned) { showUnplanned2 = false; showPlanned = false; unplannedPanel2Pos = null; plannedPanelPos = null; } }}
         >
             Available Strip
         </button>
 
-        <button 
+        <button
             class="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all font-medium"
-            onclick={() => { showUnplanned2 = !showUnplanned2; if (showUnplanned2) { showUnplanned = false; unplannedPanelPos = null; } }}
+            onclick={() => { showUnplanned2 = !showUnplanned2; if (showUnplanned2) { showUnplanned = false; showPlanned = false; unplannedPanelPos = null; plannedPanelPos = null; } }}
         >
             Unplanned Orders
+        </button>
+
+        <button
+            class="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-emerald-700 transition-all font-medium"
+            onclick={() => { showPlanned = !showPlanned; if (showPlanned) { showUnplanned = false; showUnplanned2 = false; unplannedPanelPos = null; unplannedPanel2Pos = null; } }}
+        >
+            Planned Strips
         </button>
     </div>
 
@@ -764,6 +776,73 @@
                     </table>
                     {#if unplannedOrders.length === 0}
                         <div class="p-8 text-center text-gray-400 text-sm">No unplanned orders</div>
+                    {/if}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Planned Strips Panel -->
+    {#if showPlanned}
+        <div
+            class="fixed z-50 mx-4"
+            style={plannedPanelPos
+                ? `left: ${plannedPanelPos.left}px; top: ${plannedPanelPos.top}px; bottom: auto; transform: none;`
+                : 'left: calc(50% + 8rem); bottom: 7rem; transform: translateX(-50%);'}
+            transition:slide
+        >
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-[680px] max-w-[90vw] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[60vh]">
+                <!-- Header -->
+                <div
+                    class="bg-emerald-100 dark:bg-emerald-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-move select-none"
+                    role="button"
+                    tabindex="0"
+                    onmousedown={(e) => startPanelDrag(e, 'planned')}
+                    onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
+                >
+                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Planned Strips <span class="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-300">({tasks.length})</span></h3>
+                    <button
+                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
+                        onclick={() => { showPlanned = false; plannedPanelPos = null; }}
+                    >
+                        ✕
+                    </button>
+                </div>
+                <!-- Table Content -->
+                <div class="overflow-y-auto p-0">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-2">Strip ID</th>
+                                <th class="px-4 py-2">Order</th>
+                                <th class="px-4 py-2">Style</th>
+                                <th class="px-4 py-2">Line</th>
+                                <th class="px-4 py-2">Start</th>
+                                <th class="px-4 py-2">End</th>
+                                <th class="px-4 py-2 text-right">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {#each tasks as task}
+                                {@const lineObj = lines.find(l => l.id === task.lineId)}
+                                <tr
+                                    class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-emerald-50 cursor-pointer transition-colors"
+                                    onclick={() => { showPlanned = false; plannedPanelPos = null; calendar?.scrollToTask(task.id); }}
+                                    title="Click to go to this strip on the board"
+                                >
+                                    <td class="px-4 py-2 text-gray-500 text-xs select-none">{task.id}</td>
+                                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-white select-none">{task.orderId}</td>
+                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300 select-none">{task.style}</td>
+                                    <td class="px-4 py-2 text-gray-500 select-none text-xs">{lineObj?.name ?? task.lineId}</td>
+                                    <td class="px-4 py-2 text-gray-500 select-none text-xs">{task.start ? task.start.slice(0, 10) : '—'}</td>
+                                    <td class="px-4 py-2 text-gray-500 select-none text-xs">{task.end ? task.end.slice(0, 10) : '—'}</td>
+                                    <td class="px-4 py-2 text-right font-mono select-none">{task.quantity?.toLocaleString() ?? '—'}</td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                    {#if tasks.length === 0}
+                        <div class="p-8 text-center text-gray-400 text-sm">No planned strips</div>
                     {/if}
                 </div>
             </div>
