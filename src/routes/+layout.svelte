@@ -1,7 +1,7 @@
 <script>
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { getLoggedUser, getPlanningBoards, logout } from '$lib/api-call.js';
+	import { fetchAndSetCsrfToken, getLoggedUser, getPlanningBoards, logout } from '$lib/api-call.js';
 	import favicon from '$lib/assets/favicon.svg';
 	import Toast from '$lib/components/Toast.svelte';
 	import { auth } from '$lib/stores/auth.svelte.js';
@@ -67,6 +67,7 @@
 		}
 
 		auth.user = user;
+		await fetchAndSetCsrfToken();
 
 		// Restore board from session storage
 		const stored = sessionStorage.getItem('selectedBoard');

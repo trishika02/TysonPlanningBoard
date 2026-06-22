@@ -14,36 +14,59 @@ const frappeFetch = async (url, options = {}) => {
 	return response;
 };
 
+// More robust than regex: handles encoded values and edge cases
+const readCookieValue = (name) => {
+	const value = `; ${document.cookie}`;
+	const parts = value.split(`; ${name}=`);
+	if (parts.length === 2) {
+		const raw = parts.pop().split(';').shift();
+		return raw ? decodeURIComponent(raw) : null;
+	}
+	return null;
+};
+
 const getCsrfToken = () => {
-	// Try window.frappe first for backward compatibility
-	if (window.frappe?.csrf_token) {
+	// Priority 1: window.frappe (set by Frappe's own pages)
+	if (window.frappe?.csrf_token && window.frappe.csrf_token !== 'Guest') {
 		return window.frappe.csrf_token;
 	}
-	// Otherwise return the cached token
+	// Priority 2: frappe_csrf_token cookie (Frappe sets this as a non-httpOnly cookie)
+	const fromCookie = readCookieValue('frappe_csrf_token');
+	if (fromCookie && fromCookie !== 'Guest') return fromCookie;
+	// Priority 3: cached token
 	return csrfToken || '';
 };
 
 export const fetchAndSetCsrfToken = async () => {
+	// Method 1: frappe_csrf_token cookie (set by Frappe after login, should be readable by JS)
+	const fromCookie = readCookieValue('frappe_csrf_token');
+	if (fromCookie && fromCookie !== 'Guest') {
+		csrfToken = fromCookie;
+		if (window.frappe) window.frappe.csrf_token = csrfToken;
+		return true;
+	}
+
+	// Diagnostic: show available cookies so we can debug if the cookie isn't there
+	console.warn('[CSRF] frappe_csrf_token not in cookies. All cookies:', document.cookie || '(none)');
+
+	// Method 2: GET the custom endpoint — GET requests don't require a CSRF token
 	try {
 		const response = await frappeFetch(
 			'/api/method/asl_core.asl_production.doctype.strip.strip.get_csrf_token'
 		);
-		if (!response.ok) {
-			console.error('Failed to fetch CSRF token');
-			return false;
+		if (response.ok) {
+			const data = await response.json();
+			csrfToken = data?.message || '';
+			if (window.frappe) window.frappe.csrf_token = csrfToken;
+			return true;
 		}
-		const data = await response.json();
-		csrfToken = data?.message || '';
-		// Also set it on window.frappe for consistency
-		if (window.frappe) {
-			window.frappe.csrf_token = csrfToken;
-		}
-		console.log('CSRF token fetched successfully');
-		return true;
+		const body = await response.text().catch(() => '');
+		console.error('[CSRF] get_csrf_token endpoint failed:', response.status, body);
 	} catch (error) {
-		console.error('Error fetching CSRF token:', error);
-		return false;
+		console.error('[CSRF] Error calling get_csrf_token:', error);
 	}
+
+	return false;
 };
 
 export const login = async (usr, pwd) => {
