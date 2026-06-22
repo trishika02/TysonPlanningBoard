@@ -778,6 +778,7 @@
         };
 
         // 4. Use recalculateTask to get the correct end date for the split quantity
+        let newTaskStart_Calculated = new Date(newTaskStart);
         let newTaskEnd = new Date(newTaskStart);
         newTaskEnd.setDate(newTaskEnd.getDate() + 2); // fallback
         let splitTimeline = [];
@@ -785,6 +786,7 @@
 
         if (recalculateTask) {
             const splitResult = recalculateTask(splitTaskDraft, newTaskStart, originalTask.lineId);
+            newTaskStart_Calculated = new Date(splitResult.start);
             newTaskEnd = new Date(splitResult.end);
             splitTimeline = splitResult.timeline || [];
             splitTotalDays = splitResult.total_days || 2;
@@ -792,7 +794,7 @@
 
         const newTask = {
             ...splitTaskDraft,
-            start: newTaskStart.toISOString(),
+            start: newTaskStart_Calculated.toISOString(),
             end: newTaskEnd.toISOString(),
             timeline: splitTimeline,
             total_days: splitTotalDays,
@@ -851,19 +853,28 @@
         // 2. Remove target task
         tasks.splice(targetTaskIndex, 1);
         
-        // 3. User Logic: Sum of days
-        const addedDays = Number(targetTask.total_days) || 0;
-        const currentDays = Number(sourceTask.total_days) || 0;
+        // 3. Recalculate merged task's timeline based on new quantity and work hours
+        let mergedTimeline = [];
+        let mergedTotalDays = 2;
         
-        sourceTask.total_days = currentDays + addedDays;
-        sourceTask.total_working_days = (Number(sourceTask.total_working_days) || 0) + (Number(targetTask.total_working_days) || 0);
-
-        // Calculate new end date based on new total_days
-        const sourceStart = new Date(sourceTask.start);
-        const newEnd = new Date(sourceStart);
-        newEnd.setDate(newEnd.getDate() + sourceTask.total_days);
-        
-        sourceTask.end = newEnd.toISOString();
+        if (recalculateTask) {
+            const sourceStart = new Date(sourceTask.start);
+            const mergeResult = recalculateTask(sourceTask, sourceStart, sourceTask.lineId);
+            sourceTask.end = mergeResult.end;
+            sourceTask.timeline = mergeResult.timeline || [];
+            sourceTask.total_days = mergeResult.total_days || 2;
+            sourceTask.total_working_days = mergeResult.total_days || 2;
+        } else {
+            // Fallback: Sum of days if recalculateTask not available
+            const addedDays = Number(targetTask.total_days) || 0;
+            const currentDays = Number(sourceTask.total_days) || 0;
+            sourceTask.total_days = currentDays + addedDays;
+            sourceTask.total_working_days = (Number(sourceTask.total_working_days) || 0) + (Number(targetTask.total_working_days) || 0);
+            const sourceStart = new Date(sourceTask.start);
+            const newEnd = new Date(sourceStart);
+            newEnd.setDate(newEnd.getDate() + sourceTask.total_days);
+            sourceTask.end = newEnd.toISOString();
+        }
         
         tasks = [...tasks]; // Trigger reactivity
 
