@@ -838,7 +838,7 @@
         const originalTask = tasks.find(t => t.id === selectedTaskForSplit.id);
         if (!originalTask) return;
 
-        // 1. Reduce original task quantity
+        // 1. Capture original timing before any changes
         const oldQuantity = originalTask.quantity;
         const newOriginalQuantity = oldQuantity - splitQuantity;
         
@@ -847,21 +847,50 @@
             return;
         }
 
+        const originalStartDate = new Date(originalTask.start);
+        const originalEndDate = new Date(originalTask.end);
+        const originalDurationMs = originalEndDate.getTime() - originalStartDate.getTime();
+
+        // 2. Calculate proportional durations based on quantity ratios
+        const originalRatio = newOriginalQuantity / oldQuantity;
+        const splitRatio = splitQuantity / oldQuantity;
+
+        // 3. Update original task quantity
         originalTask.quantity = newOriginalQuantity;
 
-        // 2. Recalculate ORIGINAL task timeline based on its reduced quantity.
+        // 4. Recalculate ORIGINAL task timeline based on its reduced quantity.
         // Important: preserve the original start — recalculateTask may snap it
         // to a work-day boundary which would shift the task backward visually.
+        let originalRecalculated = false;
         if (recalculateTask) {
             const startDate = new Date(originalTask.start);
             const result = recalculateTask(originalTask, startDate, originalTask.lineId);
-            // Do NOT update originalTask.start — keep the task exactly where it is.
-            originalTask.end = result.end;
-            originalTask.timeline = result.timeline;
-            originalTask.total_days = result.total_days;
+            
+            // Check if recalculateTask actually scaled the duration (real calculator)
+            // vs just preserving the old duration (fallback mode).
+            // In fallback mode, the duration stays the same as old, so we need to fix it.
+            const resultEnd = new Date(result.end);
+            const resultDuration = resultEnd.getTime() - startDate.getTime();
+            
+            // If duration is roughly the same as original (fallback didn't scale),
+            // apply proportional scaling instead
+            if (Math.abs(resultDuration - originalDurationMs) < 60000) {
+                // Fallback mode detected — scale proportionally
+                const scaledDurationMs = originalDurationMs * originalRatio;
+                const scaledEnd = new Date(originalStartDate.getTime() + scaledDurationMs);
+                originalTask.end = scaledEnd.toISOString();
+                originalTask.timeline = result.timeline;
+                originalTask.total_days = Math.max(1, Math.round((result.total_days || 1) * originalRatio));
+            } else {
+                // Real calculator produced a different (correct) duration
+                originalTask.end = result.end;
+                originalTask.timeline = result.timeline;
+                originalTask.total_days = result.total_days;
+                originalRecalculated = true;
+            }
         }
 
-        // 3. Build new split task starting right after the original ends
+        // 5. Build new split task starting right after the original ends
         const newTaskId = `${originalTask.id}-split-${Date.now()}`;
         const newTaskStart = new Date(originalTask.end);
 
@@ -874,7 +903,7 @@
             completed_segments: []
         };
 
-        // 4. Use recalculateTask to get the correct end date for the split quantity
+        // 6. Calculate split task end date
         let newTaskStart_Calculated = new Date(newTaskStart);
         let newTaskEnd = new Date(newTaskStart);
         newTaskEnd.setDate(newTaskEnd.getDate() + 2); // fallback
@@ -887,6 +916,13 @@
             newTaskEnd = new Date(splitResult.end);
             splitTimeline = splitResult.timeline || [];
             splitTotalDays = splitResult.total_days || 2;
+
+            // If the real calculator wasn't used (fallback), scale proportionally
+            if (!originalRecalculated) {
+                const splitDurationMs = originalDurationMs * splitRatio;
+                newTaskEnd = new Date(newTaskStart.getTime() + splitDurationMs);
+                splitTotalDays = Math.max(1, Math.round((originalTask.total_days || 1) * (splitQuantity / newOriginalQuantity)));
+            }
         }
 
         const newTask = {
