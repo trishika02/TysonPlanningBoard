@@ -1122,12 +1122,14 @@
                 // lands exactly at the ghost's left edge pixel.
                 tasks[taskIndex].lineId = newLineId;
                 tasks[taskIndex].start = newStartDate.toISOString();
-                if (recalculatedData) {
+                // Only apply recalculated data if the timeline is valid (non-empty, non-zero days)
+                if (recalculatedData && recalculatedData.total_days > 0) {
                     tasks[taskIndex].end = recalculatedData.end;
                     tasks[taskIndex].timeline = recalculatedData.timeline;
                     tasks[taskIndex].total_days = recalculatedData.total_days;
                     tasks[taskIndex].total_working_days = recalculatedData.total_days;
                 } else {
+                    // Recalculation produced no valid timeline — preserve original duration
                     tasks[taskIndex].end = newEndDate.toISOString();
                 }
                 pendingUpdates.add(droppedTaskId);
@@ -1138,7 +1140,7 @@
                     lineId: newLineId,
                     start: newStartDate.toISOString(),
                 };
-                if (recalculatedData) {
+                if (recalculatedData && recalculatedData.total_days > 0) {
                     newTask.end = recalculatedData.end;
                     newTask.timeline = recalculatedData.timeline;
                     newTask.total_days = recalculatedData.total_days;

@@ -181,9 +181,38 @@ export function transformStripToTask(strip) {
     // Calculate completed quantity from timeline
     const completedQty = strip.plannedQty || 0;
 
-    // Format dates
-    const startISO = strip.startDate || new Date().toISOString();
-    const endISO = strip.endDate || new Date().toISOString();
+    // Never mix sources: current-time fallback for start + real past deliveryDate for end = end < start
+    let startISO, endISO;
+    if (strip.startDate && strip.endDate) {
+        // Best case: calculated timeline dates
+        startISO = strip.startDate;
+        endISO = strip.endDate;
+    } else if (strip.sewingStartDate) {
+        // DB pair: sewing start + delivery date
+        startISO = new Date(strip.sewingStartDate).toISOString();
+        endISO = strip.deliveryDate
+            ? new Date(strip.deliveryDate).toISOString()
+            : startISO;
+    } else if (strip.deliveryDate) {
+        // Only have delivery date — use as both (zero-width point, at least it's in the right place)
+        startISO = new Date(strip.deliveryDate).toISOString();
+        endISO = startISO;
+    } else {
+        startISO = new Date().toISOString();
+        endISO = startISO;
+    }
+    // Guard: end must not be before start (would give negative total_days)
+    if (endISO < startISO) endISO = startISO;
+
+    console.log('[transformStripToTask]', strip.id, {
+        raw_startDate: strip.startDate,
+        raw_endDate: strip.endDate,
+        raw_sewingStartDate: strip.sewingStartDate,
+        raw_deliveryDate: strip.deliveryDate,
+        resolved_startISO: startISO,
+        resolved_endISO: endISO,
+        timeline_length: strip.timeline?.length ?? 0,
+    });
 
     return {
         id: strip.id,

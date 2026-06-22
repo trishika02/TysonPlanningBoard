@@ -466,15 +466,23 @@
                      // FALLBACK: Preserve original duration
                      const oldStart = new Date(task.start);
                      const oldEnd = new Date(task.end);
-                     const durationMs = oldEnd.getTime() - oldStart.getTime();
-                     
+                     let durationMs = oldEnd.getTime() - oldStart.getTime();
+
+                     // If strip never had a real duration (no timeline was calculated),
+                     // give it a minimum of 7 days so it's visible on the board
+                     const MIN_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+                     if (durationMs <= 0) durationMs = MIN_DURATION_MS;
+
                      const newEnd = new Date(newStartDate.getTime() + durationMs);
-                     
+                     const fallbackDays = task.total_days > 0
+                         ? task.total_days
+                         : Math.ceil(durationMs / (24 * 60 * 60 * 1000));
+
                      return {
                          start: newStartDate.toISOString(),
                          end: newEnd.toISOString(),
                          timeline: task.timeline || [],
-                         total_days: task.total_days || 0
+                         total_days: fallbackDays
                      };
                 }
 

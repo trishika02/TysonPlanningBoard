@@ -546,16 +546,23 @@
             {draggedUnplannedTask}
             {workHoursData}
             recalculateTask={(task, newStartDate, newLineId) => {
-                // FALLBACK: preserve original duration when no work hours available
-                if (!workHoursData || workHoursData.length === 0) {
-                    const durationMs = new Date(task.end) - new Date(task.start);
-                    const newEnd = new Date(newStartDate.getTime() + durationMs);
+                // Helper: compute a safe fallback end date — never zero-width
+                const MIN_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+                const safeFallback = () => {
+                    let ms = new Date(task.end) - new Date(task.start);
+                    if (ms <= 0) ms = MIN_DURATION_MS;
+                    const days = task.total_days > 0 ? task.total_days : Math.ceil(ms / (24 * 60 * 60 * 1000));
                     return {
                         start: newStartDate.toISOString(),
-                        end: newEnd.toISOString(),
+                        end: new Date(newStartDate.getTime() + ms).toISOString(),
                         timeline: task.timeline || [],
-                        total_days: task.total_days || 0
+                        total_days: days
                     };
+                };
+
+                // FALLBACK: preserve original duration when no work hours available
+                if (!workHoursData || workHoursData.length === 0) {
+                    return safeFallback();
                 }
 
                 // Filter and sort work hours for the target line
@@ -564,15 +571,7 @@
                     .sort((a, b) => a.Date.localeCompare(b.Date));
 
                 if (lineWorkHours.length === 0) {
-                    // FALLBACK: no work hours for this line
-                    const durationMs = new Date(task.end) - new Date(task.start);
-                    const newEnd = new Date(newStartDate.getTime() + durationMs);
-                    return {
-                        start: newStartDate.toISOString(),
-                        end: newEnd.toISOString(),
-                        timeline: task.timeline || [],
-                        total_days: task.total_days || 0
-                    };
+                    return safeFallback();
                 }
 
                 // Resolve shift for this line
@@ -597,16 +596,14 @@
 
                 const { timeline } = generateTimeline(stripData, lineWorkHours, shiftData);
 
-                const startStr = timeline.length > 0
-                    ? `${timeline[0].date} ${timeline[0].shift_start_time}`
-                    : newStartDate.toISOString();
-                const endStr = timeline.length > 0
-                    ? `${timeline[timeline.length - 1].date} ${timeline[timeline.length - 1].shift_end_time}`
-                    : newStartDate.toISOString();
+                // If timeline is empty (e.g. quantity=0 or no matching work hours), fall back
+                if (timeline.length === 0) {
+                    return safeFallback();
+                }
 
                 return {
-                    start: startStr,
-                    end: endStr,
+                    start: `${timeline[0].date} ${timeline[0].shift_start_time}`,
+                    end: `${timeline[timeline.length - 1].date} ${timeline[timeline.length - 1].shift_end_time}`,
                     timeline,
                     total_days: timeline.length
                 };
