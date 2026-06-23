@@ -53,6 +53,8 @@
 		auth.selectedBoard = null;
 		auth.boards = [];
 		sessionStorage.removeItem('selectedBoard');
+		showLogoutConfirm = false;
+		isLoggingOut = false;
 		goto('/login');
 	}
 
