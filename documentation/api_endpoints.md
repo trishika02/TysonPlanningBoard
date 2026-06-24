@@ -1,138 +1,214 @@
 # Planning Board API Endpoints
 
-This document provides a comprehensive list of all the API endpoints used in the planning board codebase, along with their respective JavaScript functions, HTTP methods, and parameter details.
-
-## Endpoint Summary Table
-
-| # | JS Function | HTTP Method | API Endpoint | Description |
-|---|-------------|-------------|--------------|-------------|
-| 1 | `fetchAndSetCsrfToken` | GET | `/api/method/asl_core.asl_production.doctype.strip.strip.get_csrf_token` | Fetches a new CSRF token. |
-| 2 | `login` | POST | `/api/method/login` | Authenticates a user with username (`usr`) and password (`pwd`). |
-| 3 | `logout` | POST | `/api/method/logout` | Logs out the current user and clears session tokens. |
-| 4 | `getLoggedUser` | GET | `/api/method/frappe.auth.get_logged_user` | Gets information about the currently logged-in user. |
-| 5 | `getWorkHourDateRange` | GET | `/api/method/asl_core.api.external.planning_board.get_work_hour_date_range` | Fetches the work hour date range for a planning board. |
-| 6 | `getPlanningBoards` | GET | `/api/method/asl_core.api.external.planning_board.get_planning_boards` | Retrieves a list of available planning boards. |
-| 7 | `getFloorLineData` | GET | `/api/method/asl_core.asl_production.doctype.sewing_planning_board_setup.sewing_planning_board_setup.get_floors_and_lines` | Fetches floors and lines data for a planning board. |
-| 8 | `getWorkHourData` | GET | `/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours` | Fetches daily work hours data. |
-| 9 | `getStripsWithLearningCurve` | GET | `/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve` | Retrieves strips data with learning curves. |
-| 10 | `getShiftDetails` | GET | `/api/method/asl_core.api.external.shift.get_shift_details` | Fetches shift specific setup details. |
-| 11 | `updateStripsFromTyson` | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.update_strips_from_tyson` | Updates strips data imported from Tyson (CSRF Protected). |
-| 12 | `saveTysonChanges` | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.save_tyson_changes` | Saves modifications made to Tyson data (CSRF Protected). |
+This document provides an exhaustive reference of all available API endpoints, mapped against their corresponding JavaScript client functions, HTTP methods, and required payloads/query parameters.
 
 ---
 
-## Detailed Endpoint Breakdown
+## 1. Endpoint Summary Table
 
-### 1. Get CSRF Token
-- **Function:** `fetchAndSetCsrfToken()`
-- **Method:** `GET`
-- **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.get_csrf_token`
-- **Description:** Used to securely retrieve a CSRF token if it is not present in the browser cookies.
+| # | Category | HTTP Method | API Endpoint | JS Function Match |
+|---|---|---|---|---|
+| 1 | **Auth** | POST | `/api/method/login` | `login(usr, pwd)` |
+| 2 | **Auth** | POST | `/api/method/logout` | `logout()` |
+| 3 | **Auth** | GET | `/api/method/frappe.auth.get_logged_user` | `getLoggedUser()` |
+| 4 | **Auth** | GET | `/api/method/asl_core.asl_production.doctype.strip.strip.get_csrf_token` | `fetchAndSetCsrfToken()` |
+| 5 | **Planning Boards** | GET | `/api/method/asl_core.api.external.planning_board.get_planning_boards` | `getPlanningBoards()` |
+| 6 | **Planning Boards** | GET | `/api/method/asl_core.api.external.planning_board.get_work_hour_date_range` | `getWorkHourDateRange(board)` |
+| 7 | **Floors & Lines** | GET | `/api/method/asl_core.asl_production.doctype.sewing_planning_board_setup.sewing_planning_board_setup.get_floors_and_lines` | `getFloorLineData(board)` |
+| 8 | **Floors & Lines** | GET | `/api/method/asl_core.api.external.setup.get_floor_details` | *None (Direct Call Only)* |
+| 9 | **Floors & Lines** | GET | `/api/method/asl_core.api.external.setup.get_line_details` | *None (Direct Call Only)* |
+| 10 | **Work Hours** | GET | `/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours` | `getWorkHourData(...)` |
+| 11 | **Shifts** | GET | `/api/method/asl_core.api.external.shift.get_shift_details` | `getShiftDetails()` |
+| 12 | **Strips** | GET | `/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve` | `getStripsWithLearningCurve(board)` |
+| 13 | **Strips** | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.get_overlapping_intervals` | *None (Requires CSRF Token)* |
+| 14 | **Strips** | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.merge_strip` | *None (Requires CSRF Token)* |
+| 15 | **Strips** | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.update_merged_strips` | *None (Requires CSRF Token)* |
+| 16 | **Strips** | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.freeze_form` | *None (Requires CSRF Token)* |
+| 17 | **Strips** | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.update_strips_from_tyson` | `updateStripsFromTyson(data)` |
+| 18 | **Strips** | POST | `/api/method/asl_core.asl_production.doctype.strip.strip.save_tyson_changes` | `saveTysonChanges(changes)` |
 
-### 2. User Login
-- **Function:** `login(usr, pwd)`
+---
+
+## 2. Detailed Endpoint Breakdown
+
+### ─── Auth ───
+
+#### User Login
 - **Method:** `POST`
 - **Endpoint:** `/api/method/login`
-- **Payload:**
+- **Headers:** `Content-Type: application/json`
+- **Payload Structure:**
 ```json
   {
-    "usr": "username",
-    "pwd": "password"
+      "usr": "Administrator",
+      "pwd": "password_here"
   }
 
 ```
 
-### 3. User Logout
+#### User Logout
 
-* **Function:** `logout()`
 * **Method:** `POST`
 * **Endpoint:** `/api/method/logout`
 
-### 4. Get Logged-in User
+#### Get Logged User
 
-* **Function:** `getLoggedUser()`
 * **Method:** `GET`
 * **Endpoint:** `/api/method/frappe.auth.get_logged_user`
 
-### 5. Get Work Hour Date Range
+#### Get CSRF Token
 
-* **Function:** `getWorkHourDateRange(planningBoard)`
 * **Method:** `GET`
-* **Endpoint:** `/api/method/asl_core.api.external.planning_board.get_work_hour_date_range`
-* **Query Parameters:**
-* `planning_board_name` (String, Required)
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.get_csrf_token`
 
+---
 
+### ─── Planning Boards ───
 
-### 6. Get Planning Boards
+#### Get All Planning Boards
 
-* **Function:** `getPlanningBoards()`
 * **Method:** `GET`
 * **Endpoint:** `/api/method/asl_core.api.external.planning_board.get_planning_boards`
+* **Optional Query Parameter:** `?company=Company Name`
 
-### 7. Get Floors and Lines Data
+#### Get Work Hour Date Range
 
-* **Function:** `getFloorLineData(planningBoard)`
+* **Method:** `GET`
+* **Endpoint:** `/api/method/asl_core.api.external.planning_board.get_work_hour_date_range`
+* **Query Parameter:** `?planning_board_name=Board_Name`
+
+---
+
+### ─── Floors & Lines ───
+
+#### Get Floors and Lines
+
 * **Method:** `GET`
 * **Endpoint:** `/api/method/asl_core.asl_production.doctype.sewing_planning_board_setup.sewing_planning_board_setup.get_floors_and_lines`
-* **Query Parameters:**
-* `planning_board_name` (String, Default fallback: `Sewing Board-MF-020226-02882`)
+* **Query Parameter:** `?planning_board_name=Board_Name`
 
+#### Get Floor Details
 
+* **Method:** `GET`
+* **Endpoint:** `/api/method/asl_core.api.external.setup.get_floor_details`
 
-### 8. Get Daily Work Hours Data
+#### Get Line Details
 
-* **Function:** `getWorkHourData(fromDate, toDate, planningBoard)`
+* **Method:** `GET`
+* **Endpoint:** `/api/method/asl_core.api.external.setup.get_line_details`
+* **Optional Query Parameter:** `?floor_id=1`
+
+---
+
+### ─── Work Hours ───
+
+#### Get Daily Work Hours
+
 * **Method:** `GET`
 * **Endpoint:** `/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours`
-* **Query Parameters:**
-* `company` (String, Hardcoded: `M.I.M Fashion Wear Ltd.`)
-* `planning_board_name` (String)
-* `from_date` (String, Format: `YYYY-MM-DD`)
-* `to_date` (String, Format: `YYYY-MM-DD`)
+* **Query Parameters:** `?company=Company Name&planning_board_name=Board_Name&from_date=YYYY-MM-DD&to_date=YYYY-MM-DD`
 
+---
 
+### ─── Shifts ───
 
-### 9. Get Strips With Learning Curve
+#### Get Shift Details
 
-* **Function:** `getStripsWithLearningCurve(planningBoard)`
-* **Method:** `GET`
-* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve`
-* **Query Parameters:**
-* `planning_board_name` (String)
-
-
-
-### 10. Get Shift Details
-
-* **Function:** `getShiftDetails()`
 * **Method:** `GET`
 * **Endpoint:** `/api/method/asl_core.api.external.shift.get_shift_details`
+* **Optional Query Parameter:** `?shift_name=General`
 
-### 11. Update Strips From Tyson
+---
 
-* **Function:** `updateStripsFromTyson(stripsData)`
-* **Method:** `POST` (Requires `X-Frappe-CSRF-Token` header)
-* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.update_strips_from_tyson`
-* **Payload:**
+### ─── Strips ───
+
+#### Get Strips with Learning Curve
+
+* **Method:** `GET`
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.get_strips_with_learning_curve`
+* **Query Parameter:** `?planning_board_name=Board_Name`
+
+#### Get Overlapping Intervals
+
+* **Method:** `POST`
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.get_overlapping_intervals`
+* **Headers:** Includes `X-Frappe-CSRF-Token`
+* **Payload Structure:**
 
 ```json
   {
-    "data": "STRINGIFIED_STRIPS_DATA"
+      "doc": "{}"
   }
 
 ```
 
-### 12. Save Tyson Changes
+#### Merge Strip
 
-* **Function:** `saveTysonChanges(changes)`
-* **Method:** `POST` (Requires `X-Frappe-CSRF-Token` header)
-* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.save_tyson_changes`
-* **Payload:**
+* **Method:** `POST`
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.merge_strip`
+* **Headers:** Includes `X-Frappe-CSRF-Token`
+* **Payload Structure:**
 
 ```json
   {
-    "data": "STRINGIFIED_CHANGES_DATA"
+      "source_name": "STRIP-0001"
+  }
+
+```
+
+#### Update Merged Strips
+
+* **Method:** `POST`
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.update_merged_strips`
+* **Headers:** Includes `X-Frappe-CSRF-Token`
+* **Payload Structure:**
+
+```json
+  {
+      "merged_strips_json": "[]",
+      "merged_with_json": "[]"
+  }
+
+```
+
+#### Freeze Form
+
+* **Method:** `POST`
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.freeze_form`
+* **Headers:** Includes `X-Frappe-CSRF-Token`
+* **Payload Structure:**
+
+```json
+  {
+      "doc": "{}"
+  }
+
+```
+
+#### Update Strips from Tyson
+
+* **Method:** `POST`
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.update_strips_from_tyson`
+* **Headers:** Includes `X-Frappe-CSRF-Token`
+* **Payload Structure:**
+
+```json
+  {
+      "data": "[]"
+  }
+
+```
+
+#### Save Tyson Changes
+
+* **Method:** `POST`
+* **Endpoint:** `/api/method/asl_core.asl_production.doctype.strip.strip.save_tyson_changes`
+* **Headers:** Includes `X-Frappe-CSRF-Token`
+* **Payload Structure:**
+
+```json
+  {
+      "data": "{\"updates\": [], \"splits\": [], \"merges\": []}"
   }
 
 ```
