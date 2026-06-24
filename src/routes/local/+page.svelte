@@ -428,6 +428,12 @@
                     pendingUpdates.clear();
                     pendingSplits = [];
                     pendingMerges = [];
+
+                    // Reload from backend so server-computed timelines and real strip IDs
+                    // replace the locally-generated placeholders (especially after splits).
+                    if (auth.selectedBoard?.name) {
+                        await loadBoardData(auth.selectedBoard.name);
+                    }
                 } catch (error) {
                     console.error('Error saving changes:', error);
                     dismissToast(savingId);
