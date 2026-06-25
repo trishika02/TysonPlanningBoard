@@ -1,5 +1,7 @@
+const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://manami-stage.altersense.net';
+
 export async function GET({ url, fetch }) {
-    const targetUrl = new URL(url.pathname.replace('/api', '/api'), 'https://manami-stage.altersense.net');
+    const targetUrl = new URL(url.pathname.replace('/api', '/api'), baseUrl);
     targetUrl.search = url.search;
 
     const response = await fetch(targetUrl.toString());
