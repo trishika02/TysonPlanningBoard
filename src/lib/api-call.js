@@ -86,7 +86,13 @@ export const login = async (usr, pwd) => {
 };
 
 export const logout = async () => {
-	await frappeFetch('/api/method/logout', { method: 'POST' });
+	await frappeFetch('/api/method/logout', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-Frappe-CSRF-Token': getCsrfToken()
+		}
+	});
 	// Clear CSRF token on logout
 	csrfToken = null;
 	if (window.frappe) {

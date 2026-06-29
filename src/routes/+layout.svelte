@@ -1,5 +1,5 @@
 <script>
-	import { goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { fetchAndSetCsrfToken, getLoggedUser, getPlanningBoards, logout } from '$lib/api-call.js';
 	import favicon from '$lib/assets/favicon.svg';
@@ -29,10 +29,25 @@
 		}
 	});
 
+	// Redirect unauthenticated users to /login (handles back-navigation after logout)
+	$effect(() => {
+		if (!isLoginPage && !auth.user && !auth.isLoading) {
+			goto('/login');
+		}
+	});
+
+	// Block back/forward navigation to protected routes while logged out
+	beforeNavigate(({ to, cancel }) => {
+		if (!auth.isLoading && !auth.user && to?.url.pathname !== '/login') {
+			cancel();
+		}
+	});
+
 	// Board selector state
 	let showBoardSelector = $state(false);
 	let showLogoutConfirm = $state(false);
 	let isLoggingOut = $state(false);
+	let showProfileDropdown = $state(false);
 
 	function selectBoard(board) {
 		const prev = auth.selectedBoard?.name;
@@ -55,7 +70,8 @@
 		sessionStorage.removeItem('selectedBoard');
 		showLogoutConfirm = false;
 		isLoggingOut = false;
-		goto('/login');
+		// Hard redirect: clears JS state, removes /local from history so back button can't return to it
+		window.location.replace('/login');
 	}
 
 	onMount(async () => {
@@ -93,8 +109,8 @@
 
 {#if isLoginPage}
 	{@render children()}
-{:else if auth.isLoading}
-	<!-- Full-screen loading while checking session -->
+{:else if auth.isLoading || !auth.user}
+	<!-- Full-screen loading while checking session or redirecting unauthenticated user -->
 	<div class="min-h-screen bg-gray-50 flex items-center justify-center">
 		<div class="text-center">
 			<div class="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
@@ -106,12 +122,8 @@
 
 		<!-- Top Navigation Bar -->
 		<nav class="w-[90%] bg-white shadow-sm rounded-b-lg px-6 py-4 mb-6 flex justify-between items-center border border-gray-100">
-			<div class="flex items-center space-x-8">
+			<div class="flex items-center">
 				<h1 class="text-xl font-bold text-gray-800 tracking-tight">ALTERSENSE</h1>
-				<div class="flex space-x-2">
-					<button class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-md hover:bg-blue-50">Planning</button>
-					<button class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors px-3 py-1.5 rounded-md hover:bg-blue-50">Reports</button>
-				</div>
 			</div>
 			<div class="flex items-center space-x-3">
 				<!-- Board selector button -->
@@ -122,27 +134,58 @@
 					>
 						<span class="text-xs text-gray-400">Board:</span>
 						<span>{auth.selectedBoard.name}</span>
-					
 					</button>
 				{/if}
 
 				<div class="w-px h-6 bg-gray-200"></div>
-				<button class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg transition-colors shadow-sm">Export</button>
 				<button
 					class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg"
 					onclick={handleSave}
 				>
 					Save Changes
 				</button>
-				<div class="w-px h-6 bg-gray-200 mx-1"></div>
-				<!-- User + Logout -->
-				<span class="text-sm text-gray-500 max-w-[120px] truncate">{auth.user}</span>
-				<button
-					onclick={() => showLogoutConfirm = true}
-					class="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors"
-				>
-					Logout
-				</button>
+				<div class="w-px h-6 bg-gray-200"></div>
+
+				<!-- Profile dropdown -->
+				<div class="relative">
+					<button
+						onclick={() => showProfileDropdown = !showProfileDropdown}
+						class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors"
+					>
+						<div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">
+							{auth.user?.charAt(0).toUpperCase()}
+						</div>
+						<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+						</svg>
+					</button>
+
+					{#if showProfileDropdown}
+						<div class="fixed inset-0 z-40" onclick={() => showProfileDropdown = false}></div>
+						<div class="absolute right-0 top-full mt-2 w-60 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
+							<div class="px-4 py-3 border-b border-gray-100">
+								<div class="flex items-center gap-3">
+									<div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">
+										{auth.user?.charAt(0).toUpperCase()}
+									</div>
+									<div class="min-w-0">
+										<p class="text-sm font-semibold text-gray-900 truncate">{auth.user}</p>
+										<p class="text-xs text-gray-400 mt-0.5">Logged in</p>
+									</div>
+								</div>
+							</div>
+							<button
+								onclick={() => { showProfileDropdown = false; showLogoutConfirm = true; }}
+								class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+							>
+								<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+								</svg>
+								Sign out
+							</button>
+						</div>
+					{/if}
+				</div>
 			</div>
 		</nav>
 
