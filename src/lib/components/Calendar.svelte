@@ -970,6 +970,70 @@
         selectedTaskForSplit = null;
     }
 
+    // --- GAP FILLER STATE & FUNCTIONS ---
+    let selectedTaskIdsForGap = $state(new Set());
+
+    // Computed lists using Svelte 5 snippets
+    const selectedTasksList = $derived(
+        tasks.filter(t => selectedTaskIdsForGap.has(t.id))
+    );
+
+    const canFillGap = $derived(
+        selectedTasksList.length === 2 && 
+        selectedTasksList[0].lineId === selectedTasksList[1].lineId
+    );
+
+    function toggleTaskSelectionForGap(taskId) {
+        if (selectedTaskIdsForGap.has(taskId)) {
+            selectedTaskIdsForGap.delete(taskId);
+        } else {
+            if (selectedTaskIdsForGap.size >= 2) {
+                const firstElement = selectedTaskIdsForGap.values().next().value;
+                selectedTaskIdsForGap.delete(firstElement);
+            }
+            selectedTaskIdsForGap.add(taskId);
+        }
+        selectedTaskIdsForGap = new Set(selectedTaskIdsForGap);
+    }
+
+    function clearGapSelection() {
+        selectedTaskIdsForGap = new Set();
+    }
+
+    function fillGapBetweenStrips() {
+        if (!canFillGap) return;
+
+        // Sort tasks chronologically by start date
+        const sortedSelected = [...selectedTasksList].sort((a, b) => new Date(a.start) - new Date(b.start));
+        const firstTask = sortedSelected[0];
+        const secondTask = sortedSelected[1];
+
+        const taskToUpdate = tasks.find(t => t.id === secondTask.id);
+        if (!taskToUpdate) return;
+
+        // 2nd strip start time moves to 1st strip end time
+        const newStart = new Date(firstTask.end);
+
+        if (recalculateTask) {
+            const result = recalculateTask(taskToUpdate, newStart, taskToUpdate.lineId);
+            taskToUpdate.start = result.start;
+            taskToUpdate.end = result.end;
+            taskToUpdate.timeline = result.timeline;
+            taskToUpdate.total_days = result.total_days;
+            taskToUpdate.total_working_days = result.total_days;
+        } else {
+            const oldStart = new Date(taskToUpdate.start);
+            const delta = newStart - oldStart;
+            const newEnd = new Date(new Date(taskToUpdate.end).getTime() + delta);
+            taskToUpdate.start = newStart.toISOString();
+            taskToUpdate.end = newEnd.toISOString();
+        }
+
+        pendingUpdates.add(taskToUpdate.id);
+        tasks = [...tasks];
+        clearGapSelection();
+    }
+
     function handleMergeTask(targetTask) {
         if (!selectedTaskForMerge || !targetTask) return;
 
@@ -1535,16 +1599,34 @@
             </div>
         {/if}
 
-        <!-- Right: Search Bar -->
-        <div class="relative group">
+        <div class="flex items-center gap-3">
+            {#if selectedTaskIdsForGap.size > 0}
+                <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full text-xs">
+                    <span class="font-medium text-amber-800">
+                        Selected: {selectedTaskIdsForGap.size}/2 strips
+                    </span>
+                    <button onclick={clearGapSelection} class="text-amber-500 hover:text-amber-700 ml-1 font-bold">✕</button>
+                    <button
+                        onclick={fillGapBetweenStrips}
+                        disabled={!canFillGap}
+                        class="ml-2 px-2.5 py-0.5 font-semibold text-[11px] uppercase tracking-wider rounded-md text-white transition-all
+                               {canFillGap ? 'bg-amber-600 hover:bg-amber-700 shadow-sm' : 'bg-gray-300 cursor-not-allowed opacity-60'}"
+                    >
+                        ⚡ Fill Gap
+                    </button>
+                </div>
+            {/if}
+
+            <div class="relative group">
                 <input 
-                type="text" 
-                placeholder="Search..." 
-                class="text-xs pl-8 pr-3 py-1.5 border border-gray-200 bg-gray-50 rounded-full w-32 focus:w-48 transition-all focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 shadow-sm"
-            >
-            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2 group-focus-within:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    type="text" 
+                    placeholder="Search..." 
+                    class="text-xs pl-8 pr-3 py-1.5 border border-gray-200 bg-gray-50 rounded-full w-32 focus:w-48 transition-all focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 shadow-sm"
+                >
+                <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2 group-focus-within:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
+                </svg>
+            </div>
         </div>
     </div>
 
@@ -1593,15 +1675,23 @@
 
             <!-- 2. Tasks Layer (Managed by Svelte) -->
             <div id="tasks-layer" class="absolute inset-0 z-10 pointer-events-none" class:drag-active={isDragging}>
-                <!-- Tasks rendered by Svelte loop -->
                 {#each tasks as task (task.id)}
                     {@const isCandidate = showMergeModal && mergeCandidates.some(t => t.id === task.id)}
                     {@const isSource = showMergeModal && selectedTaskForMerge && selectedTaskForMerge.id === task.id}
                     {@const isDimmed = showMergeModal && !isCandidate && !isSource}
+                    {@const isGapSelected = selectedTaskIdsForGap.has(task.id)}
                     
                     {#if getTaskStyle(task)}
                         {@const taskStyle = getTaskStyle(task)}
                         {@const holidaySegs = getHolidaySegments(task)}
+                        
+                        {#if isGapSelected}
+                            <div 
+                                class="absolute z-20 pointer-events-none rounded transition-all animate-pulse" 
+                                style="{taskStyle} outline: 3px solid #d97706; outline-offset: 1px; background-color: rgba(217, 119, 6, 0.1);"
+                            ></div>
+                        {/if}
+
                         <Task 
                             {task}
                             style={taskStyle}
@@ -1612,11 +1702,13 @@
                             onDragEnd={(e) => handleDragEnd(e)}
                             onClick={(e, t) => {
                                 if (isCandidate) handleMergeTask(t);
+                                // Optional click selector hook:
+                                if (selectedTaskIdsForGap.size > 0) toggleTaskSelectionForGap(t.id);
                             }}
                             onContextMenu={(e, task) => handleTaskContextMenu(e, task)}
                             {formatDate}
                         />
-                        <!-- Holiday stripe overlays (one per holiday day crossing this task) -->
+                        
                         {#each holidaySegs as seg}
                             <div
                                 class="absolute pointer-events-none"
@@ -1648,17 +1740,25 @@
 
     <!-- Context Menu -->
     <ContextMenu 
-        bind:visible={showContextMenu}
-        x={contextMenuX}
-        y={contextMenuY}
-        menuItems={[
-            { id: 'split', label: 'Split Task', icon: '✂️' },
-            { id: 'merge', label: 'Merge Task', icon: '🔗' },
-            { id: 'strip-details', label: 'Strip Details', icon: '📋' },
-            { id: 'update-datetime', label: selectedTaskForContext?.start ? 'Update Date & Time' : 'Select Date & Time', icon: '📅' }
-        ]}
-        onItemClick={handleContextMenuItemClick}
-        onClose={handleContextMenuClose}
+            bind:visible={showContextMenu}
+            x={contextMenuX}
+            y={contextMenuY}
+            menuItems={[
+                { id: 'toggle-gap-select', label: selectedTaskForContext && selectedTaskIdsForGap.has(selectedTaskForContext.id) ? 'Deselect to Fill Gap' : 'Select to Fill Gap ⚡', icon: '📍' },
+                { id: 'split', label: 'Split Task', icon: '✂️' },
+                { id: 'merge', label: 'Merge Task', icon: '🔗' },
+                { id: 'strip-details', label: 'Strip Details', icon: '📋' },
+                { id: 'update-datetime', label: selectedTaskForContext?.start ? 'Update Date & Time' : 'Select Date & Time', icon: '📅' }
+            ]}
+            onItemClick={(item) => {
+                if (item.id === 'toggle-gap-select' && selectedTaskForContext) {
+                    toggleTaskSelectionForGap(selectedTaskForContext.id);
+                    showContextMenu = false;
+                } else {
+                    handleContextMenuItemClick(item);
+                }
+            }}
+            onClose={handleContextMenuClose}
     />
 
     <!-- Split Task Modal -->
