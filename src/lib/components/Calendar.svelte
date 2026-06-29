@@ -1717,6 +1717,7 @@
                         {@const taskStyle = getTaskStyle(task)}
                         {@const holidaySegs = getHolidaySegments(task)}
                         
+                        <!-- Visual Highlight Selection Frame for Fill Gap feature -->
                         {#if isGapSelected}
                             <div 
                                 class="absolute z-20 pointer-events-none rounded transition-all animate-pulse" 
@@ -1724,23 +1725,41 @@
                             ></div>
                         {/if}
 
+                        <!-- Calculate the precise overlap bounds so it doesn't spill past the strip edge -->
                         {#if runsToday && todayGeom}
-                            <div 
-                                class="absolute z-20 pointer-events-none border-2 border-amber-500 bg-gray-900/40 backdrop-blur-[0.5px] shadow-[0_0_12px_rgba(245,158,11,0.6)] flex items-center justify-center overflow-hidden"
-                                style="
-                                    left: {todayGeom.leftPixel}px;
-                                    width: {todayGeom.widthPixel}px;
-                                    top: {getTaskStyle(task).match(/top:\s*([^;]+)/)?.[1] || '0px'};
-                                    height: {getTaskStyle(task).match(/height:\s*([^;]+)/)?.[1] || '100px'};
-                                    border-radius: 4px;
-                                "
-                            >
-                                <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 animate-pulse"></div>
-                                
-                                <span class="text-[9px] font-black tracking-wider text-white bg-amber-600 border border-amber-400 px-1.5 py-0.5 rounded shadow-md select-none transform scale-100">
-                                    Running
-                                </span>
-                            </div>
+                            {@const taskLeft = parseFloat(getTaskStyle(task).match(/left:\s*([^px;]+)/)?.[1] || '0')}
+                            {@const taskWidth = parseFloat(getTaskStyle(task).match(/width:\s*([^px;]+)/)?.[1] || '0')}
+                            
+                            <!-- Clamp the left edge: use today's column left, unless the task starts further right -->
+                            {@const highlightLeft = Math.max(todayGeom.leftPixel, taskLeft)}
+                            
+                            <!-- Clamp the right edge: find the earliest ending point between today's column end and the task's end -->
+                            {@const todayRight = todayGeom.leftPixel + todayGeom.widthPixel}
+                            {@const taskRight = taskLeft + taskWidth}
+                            {@const highlightRight = Math.min(todayRight, taskRight)}
+                            
+                            <!-- Real calculated width of the intersection -->
+                            {@const highlightWidth = Math.max(0, highlightRight - highlightLeft)}
+
+                            <!-- Only render if there's a valid overlapping width -->
+                            {#if highlightWidth > 0}
+                                <div 
+                                    class="absolute z-20 pointer-events-none border-2 border-amber-500 bg-gray-900/40 backdrop-blur-[0.5px] shadow-[0_0_12px_rgba(245,158,11,0.6)] flex items-center justify-center overflow-hidden"
+                                    style="
+                                        left: {highlightLeft}px;
+                                        width: {highlightWidth}px;
+                                        top: {getTaskStyle(task).match(/top:\s*([^;]+)/)?.[1] || '0px'};
+                                        height: {getTaskStyle(task).match(/height:\s*([^;]+)/)?.[1] || '100px'};
+                                        border-radius: 4px;
+                                    "
+                                >
+                                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 animate-pulse"></div>
+                                    
+                                    <span class="text-[9px] font-black tracking-wider text-white bg-amber-600 border border-amber-400 px-1.5 py-0.5 rounded shadow-md select-none transform scale-100 whitespace-nowrap">
+                                        Running
+                                    </span >
+                                </div>
+                            {/if}
                         {/if}
 
                         <Task 
