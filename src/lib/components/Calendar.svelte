@@ -1755,9 +1755,9 @@
                                 >
                                     <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 animate-pulse"></div>
                                     
-                                    <span class="text-[9px] font-black tracking-wider text-white bg-amber-600 border border-amber-400 px-1.5 py-0.5 rounded shadow-md select-none transform scale-100 whitespace-nowrap">
+                                    <!-- <span class="text-[9px] font-black tracking-wider text-white bg-amber-600 border border-amber-400 px-1.5 py-0.5 rounded shadow-md select-none transform scale-100 whitespace-nowrap">
                                         Running
-                                    </span >
+                                    </span > -->
                                 </div>
                             {/if}
                         {/if}
