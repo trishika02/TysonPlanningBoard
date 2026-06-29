@@ -970,10 +970,10 @@
         selectedTaskForSplit = null;
     }
 
-    // --- GAP FILLER STATE & FUNCTIONS ---
+// --- GAP FILLER STATE & FUNCTIONS ---
     let selectedTaskIdsForGap = $state(new Set());
 
-    // Computed lists using Svelte 5 snippets
+    // Computed lists using Svelte 5 derived state
     const selectedTasksList = $derived(
         tasks.filter(t => selectedTaskIdsForGap.has(t.id))
     );
@@ -1032,6 +1032,36 @@
         pendingUpdates.add(taskToUpdate.id);
         tasks = [...tasks];
         clearGapSelection();
+    }
+
+    // --- TODAY'S TIMELINE HIGHLIGHT GEOMETRY ---
+    // Finds where Today's column starts (X coordinate) and how wide it is
+    const todayColumnGeometry = $derived(() => {
+        if (!calendarDays || calendarDays.length === 0) return null;
+        
+        // Find the index of the day marked as today
+        const todayIndex = calendarDays.findIndex(d => d.isToday);
+        if (todayIndex === -1) return null;
+
+        return {
+            leftPixel: todayIndex * dayColumnWidth,
+            widthPixel: dayColumnWidth
+        };
+    });
+
+    // Helper function to determine if a task overlaps with today's date
+    function isTaskActiveToday(task) {
+        if (!task.start || !task.end) return false;
+        const taskStart = new Date(task.start);
+        const taskEnd = new Date(task.end);
+        const currentToday = new Date(today);
+        
+        // Set times to midnight for clean calendar date comparisons
+        const s = new Date(taskStart.getFullYear(), taskStart.getMonth(), taskStart.getDate());
+        const e = new Date(taskEnd.getFullYear(), taskEnd.getMonth(), taskEnd.getDate());
+        const t = new Date(currentToday.getFullYear(), currentToday.getMonth(), currentToday.getDate());
+        
+        return t >= s && t <= e;
     }
 
     function handleMergeTask(targetTask) {
@@ -1680,6 +1710,8 @@
                     {@const isSource = showMergeModal && selectedTaskForMerge && selectedTaskForMerge.id === task.id}
                     {@const isDimmed = showMergeModal && !isCandidate && !isSource}
                     {@const isGapSelected = selectedTaskIdsForGap.has(task.id)}
+                    {@const runsToday = isTaskActiveToday(task)}
+                    {@const todayGeom = todayColumnGeometry()}
                     
                     {#if getTaskStyle(task)}
                         {@const taskStyle = getTaskStyle(task)}
@@ -1692,6 +1724,25 @@
                             ></div>
                         {/if}
 
+                        {#if runsToday && todayGeom}
+                            <div 
+                                class="absolute z-20 pointer-events-none border-2 border-amber-500 bg-gray-900/40 backdrop-blur-[0.5px] shadow-[0_0_12px_rgba(245,158,11,0.6)] flex items-center justify-center overflow-hidden"
+                                style="
+                                    left: {todayGeom.leftPixel}px;
+                                    width: {todayGeom.widthPixel}px;
+                                    top: {getTaskStyle(task).match(/top:\s*([^;]+)/)?.[1] || '0px'};
+                                    height: {getTaskStyle(task).match(/height:\s*([^;]+)/)?.[1] || '100px'};
+                                    border-radius: 4px;
+                                "
+                            >
+                                <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 animate-pulse"></div>
+                                
+                                <span class="text-[9px] font-black tracking-wider text-white bg-amber-600 border border-amber-400 px-1.5 py-0.5 rounded shadow-md select-none transform scale-100">
+                                    Running
+                                </span>
+                            </div>
+                        {/if}
+
                         <Task 
                             {task}
                             style={taskStyle}
@@ -1702,7 +1753,6 @@
                             onDragEnd={(e) => handleDragEnd(e)}
                             onClick={(e, t) => {
                                 if (isCandidate) handleMergeTask(t);
-                                // Optional click selector hook:
                                 if (selectedTaskIdsForGap.size > 0) toggleTaskSelectionForGap(t.id);
                             }}
                             onContextMenu={(e, task) => handleTaskContextMenu(e, task)}
