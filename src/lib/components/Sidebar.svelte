@@ -43,7 +43,7 @@
     <div class="sidebar-header h-36 border-b border-gray-200 flex flex-col sticky-header bg-white flex-shrink-0 z-30">
         
         <!-- ROW 1 (Top): Date Selector -->
-        <div class="h-12 w-full border-b border-gray-200 flex items-center justify-start px-4 bg-white">
+        <div class="h-12 w-full border-b border-slate-200 flex items-center justify-start px-4 bg-slate-50">
             <!-- Left: Date Selector -->
              <div class="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 border border-gray-200 hover:border-blue-300 transition-colors">
                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -67,7 +67,7 @@
         </div>
 
         <!-- ROW 2 (Middle): Work Hours Date Range -->
-        <div class="h-12 w-full border-b border-gray-200 flex flex-col items-center justify-center bg-gray-50/50 px-2">
+        <div class="h-12 w-full border-b border-slate-200 flex flex-col items-center justify-center bg-slate-50 px-2">
             {#if dateRange}
                 <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Work Hours Period</span>
                 <span class="text-xs font-semibold text-indigo-600 text-center leading-tight">
@@ -81,7 +81,7 @@
         <!-- ROW 3 (Bottom): Titles (Floor | Lines) -->
         <div class="h-12 w-full flex">
              <!-- Floor Header -->
-            <div class="w-16 border-r border-gray-200 flex flex-col items-center justify-center font-bold text-xs uppercase text-gray-500 bg-gray-50 p-2 text-center h-full">
+            <div class="w-16 border-r border-slate-200 flex flex-col items-center justify-center font-bold text-xs uppercase text-slate-500 bg-slate-100 p-2 text-center h-full">
                 Floor
             </div>
             <!-- Line Header -->
@@ -100,8 +100,8 @@
         {#each floors as floor (floor.id)}
             <div class="flex border-b border-gray-200">
                 <!-- Floor Column -->
-                <div 
-                    class="w-16 border-r border-gray-100 bg-gray-50 flex items-center justify-center font-bold text-xs text-gray-600 relative p-2"
+                <div
+                    class="w-16 border-r border-slate-100 bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-600 relative p-2"
                     style="height: {floor.lines.length * rowHeight}px;"
                 >
                     <span class="text-center">{floor.name}</span>
@@ -110,7 +110,7 @@
                 <div class="flex-1 flex flex-col divide-y divide-gray-100">
                     {#each floor.lines as line (line.id)}
                         <div 
-                            class="flex items-center px-4 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                            class="flex items-center px-4 text-xs font-bold text-slate-700 hover:bg-slate-50"
                             style="height: {rowHeight}px;"
                         >
                             {line.name}

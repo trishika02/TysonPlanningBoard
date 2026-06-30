@@ -118,44 +118,44 @@
 		</div>
 	</div>
 {:else if auth.user}
-	<div class="min-h-screen bg-gray-50 flex flex-col items-center">
+	<div class="min-h-screen bg-slate-100 flex flex-col items-center">
 
 		<!-- Top Navigation Bar -->
-		<nav class="w-[90%] bg-white shadow-sm rounded-b-lg px-6 py-4 mb-6 flex justify-between items-center border border-gray-100">
+		<nav class="w-[90%] rounded-b-xl px-6 py-4 mb-6 flex justify-between items-center shadow-lg" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
 			<div class="flex items-center">
-				<h1 class="text-xl font-bold text-gray-800 tracking-tight">ALTERSENSE</h1>
+				<h1 class="text-xl font-bold text-white tracking-tight">ALTERSENSE</h1>
 			</div>
 			<div class="flex items-center space-x-3">
 				<!-- Board selector button -->
 				{#if auth.selectedBoard}
 					<button
 						onclick={() => showBoardSelector = true}
-						class="flex items-center gap-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+						class="flex items-center gap-2 text-sm font-medium text-white/90 bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-lg transition-colors border border-white/10"
 					>
-						<span class="text-xs text-gray-400">Board:</span>
+						<span class="text-xs text-white/50">Board:</span>
 						<span>{auth.selectedBoard.name}</span>
 					</button>
 				{/if}
 
-				<div class="w-px h-6 bg-gray-200"></div>
+				<div class="w-px h-6 bg-white/20"></div>
 				<button
-					class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg"
+					class="bg-blue-500 hover:bg-blue-400 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg"
 					onclick={handleSave}
 				>
 					Save Changes
 				</button>
-				<div class="w-px h-6 bg-gray-200"></div>
+				<div class="w-px h-6 bg-white/20"></div>
 
 				<!-- Profile dropdown -->
 				<div class="relative">
 					<button
 						onclick={() => showProfileDropdown = !showProfileDropdown}
-						class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors"
+						class="flex items-center gap-2 text-sm font-medium text-white hover:bg-white/10 px-2 py-1.5 rounded-lg transition-colors"
 					>
-						<div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">
+						<div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">
 							{auth.user?.charAt(0).toUpperCase()}
 						</div>
-						<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
 						</svg>
 					</button>
@@ -190,7 +190,7 @@
 		</nav>
 
 		<!-- Main Application Body -->
-		<div class="w-[90%] bg-white rounded-xl shadow-lg border border-gray-200 flex-1 flex flex-col overflow-hidden mb-8 h-[80vh]">
+		<div class="w-[90%] bg-white rounded-xl shadow-xl border border-slate-200 flex-1 flex flex-col overflow-hidden mb-8 h-[80vh]">
 			{@render children()}
 		</div>
 

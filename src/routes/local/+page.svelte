@@ -31,6 +31,10 @@
             let plannedPanelPos = $state(null);
             /** Search query for the Planned Strips panel */
             let plannedSearch = $state('');
+            /** Search query for the Available Strip panel */
+            let availableSearch = $state('');
+            /** Search query for the Unplanned Orders panel */
+            let unplannedSearch = $state('');
             /** When dragging the panel by its header: { panel, startX, startY, startLeft, startTop } */
             let panelDragState = $state(null);
             let sidebar; // Sidebar instance binding
@@ -76,6 +80,28 @@
                     (t.orderId || '').toLowerCase().includes(q) ||
                     (t.style || '').toLowerCase().includes(q) ||
                     (t.status || '').toLowerCase().includes(q)
+                );
+            });
+
+            // Filtered available strips
+            const availableFiltered = $derived(() => {
+                const q = availableSearch.trim().toLowerCase();
+                if (!q) return unplannedTasks;
+                return unplannedTasks.filter(t =>
+                    (t.id || '').toLowerCase().includes(q) ||
+                    (t.orderId || '').toLowerCase().includes(q) ||
+                    (t.style || '').toLowerCase().includes(q)
+                );
+            });
+
+            // Filtered unplanned orders
+            const unplannedOrdersFiltered = $derived(() => {
+                const q = unplannedSearch.trim().toLowerCase();
+                if (!q) return unplannedOrders;
+                return unplannedOrders.filter(o =>
+                    (o.orderId || '').toLowerCase().includes(q) ||
+                    (o.style || '').toLowerCase().includes(q) ||
+                    (o.customer || '').toLowerCase().includes(q)
                 );
             });
 
@@ -642,21 +668,30 @@
     <!-- Floating Buttons at Bottom Center (offset for sidebar) -->
     <div class="fixed bottom-12 z-50 flex gap-4" style="left: calc(50% + 8rem); transform: translateX(-50%);">
         <button
-            class="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-blue-700 transition-all font-medium"
-            onclick={() => { showUnplanned = !showUnplanned; if (showUnplanned) { showUnplanned2 = false; showPlanned = false; unplannedPanel2Pos = null; plannedPanelPos = null; } }}
+            class="flex items-center gap-2 text-white px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all font-medium text-sm"
+            style="background: #1e40af;"
+            onmouseenter={(e) => e.currentTarget.style.background = '#1d4ed8'}
+            onmouseleave={(e) => e.currentTarget.style.background = '#1e40af'}
+            onclick={() => { showUnplanned = !showUnplanned; if (showUnplanned) { showUnplanned2 = false; showPlanned = false; unplannedPanel2Pos = null; plannedPanelPos = null; } else { availableSearch = ''; } }}
         >
             Available Strip
         </button>
 
         <button
-            class="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all font-medium"
-            onclick={() => { showUnplanned2 = !showUnplanned2; if (showUnplanned2) { showUnplanned = false; showPlanned = false; unplannedPanelPos = null; plannedPanelPos = null; } }}
+            class="flex items-center gap-2 text-white px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all font-medium text-sm"
+            style="background: #3730a3;"
+            onmouseenter={(e) => e.currentTarget.style.background = '#4338ca'}
+            onmouseleave={(e) => e.currentTarget.style.background = '#3730a3'}
+            onclick={() => { showUnplanned2 = !showUnplanned2; if (showUnplanned2) { showUnplanned = false; showPlanned = false; unplannedPanelPos = null; plannedPanelPos = null; } else { unplannedSearch = ''; } }}
         >
             Unplanned Orders
         </button>
 
         <button
-            class="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-emerald-700 transition-all font-medium"
+            class="flex items-center gap-2 text-white px-6 py-3 rounded-full shadow-md hover:shadow-lg transition-all font-medium text-sm"
+            style="background: #065f46;"
+            onmouseenter={(e) => e.currentTarget.style.background = '#047857'}
+            onmouseleave={(e) => e.currentTarget.style.background = '#065f46'}
             onclick={() => { showPlanned = !showPlanned; if (showPlanned) { showUnplanned = false; showUnplanned2 = false; unplannedPanelPos = null; unplannedPanel2Pos = null; } else { plannedSearch = ''; } }}
         >
             Planned Strips
@@ -674,62 +709,114 @@
                 : 'left: calc(50% + 8rem); bottom: 7rem; transform: translateX(-50%);'}
             transition:slide
         >
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-[600px] max-w-[90vw] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[60vh]">
-                <!-- Header (drag here to move panel) -->
+            <div class="bg-white rounded-xl shadow-2xl w-[680px] max-w-[95vw] border border-gray-200 overflow-hidden flex flex-col" style="max-height: 62vh;">
+                <!-- Header -->
                 <div
-                    class="bg-gray-100 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-move select-none"
+                    class="px-4 py-3 border-b border-gray-100 flex justify-between items-center cursor-move select-none"
+                    style="background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);"
                     role="button"
                     tabindex="0"
                     onmousedown={(e) => startPanelDrag(e, 'unplanned')}
                     onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
                 >
-                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Available Strip</h3>
-                    <button 
-                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
-                        onclick={() => { showUnplanned = false; unplannedPanelPos = null; }}
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-white opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                        <h3 class="font-bold text-white text-sm">Available Strip</h3>
+                        <span class="bg-white/20 text-white text-xs font-semibold px-2 py-0.5 rounded-full">{unplannedTasks.length}</span>
+                    </div>
+                    <button
+                        aria-label="Close Available Strip panel"
+                        class="text-white/70 hover:text-white transition-colors cursor-pointer shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-white/20"
+                        onclick={() => { showUnplanned = false; unplannedPanelPos = null; availableSearch = ''; }}
                     >
-                        ✕
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
-                
+
+                <!-- Search bar -->
+                <div class="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                        <input
+                            type="text"
+                            placeholder="Search by Strip ID, Order or Style…"
+                            bind:value={availableSearch}
+                            class="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-gray-700 placeholder-gray-400"
+                        />
+                        {#if availableSearch}
+                            <button
+                                aria-label="Clear search"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                onclick={() => availableSearch = ''}
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        {/if}
+                    </div>
+                    {#if availableSearch}
+                        <p class="text-[10px] text-gray-400 mt-1">{availableFiltered().length} of {unplannedTasks.length} strips</p>
+                    {/if}
+                </div>
+
                 <!-- Table Content -->
-                <div class="overflow-y-auto p-0">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
-                            <tr>
-                                <th class="px-4 py-2 w-10"></th> <!-- Drag Handle Column -->
-                                <th class="px-4 py-2">Strip ID</th>
-                                <th class="px-4 py-2">Order</th>
-                                <th class="px-4 py-2">Style</th>
-                                <th class="px-4 py-2 text-right">Qty</th>
+                <div class="overflow-y-auto">
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead class="sticky top-0 z-10">
+                            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                                <th class="px-3 py-2.5 w-10"></th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Strip ID</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Order</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Style</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Qty</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {#each unplannedTasks as task}
-                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 group">
-                                    <td class="px-4 py-2 text-center">
-                                        <button 
-                                            class="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 cursor-move"
+                            {#each availableFiltered() as task, i}
+                                <tr
+                                    class="border-b border-gray-100 group"
+                                    style={i % 2 === 0 ? 'background: #ffffff;' : 'background: #f9fafb;'}
+                                    onmouseenter={(e) => e.currentTarget.style.background = '#eff6ff'}
+                                    onmouseleave={(e) => e.currentTarget.style.background = i % 2 === 0 ? '#ffffff' : '#f9fafb'}
+                                >
+                                    <td class="px-3 py-2.5 text-center">
+                                        <button
+                                            class="p-1 rounded hover:bg-blue-100 text-gray-400 hover:text-blue-600 cursor-move transition-colors"
                                             title="Drag to Board"
                                             draggable="true"
                                             ondragstart={(e) => handleUnplannedDragStart(e, task)}
                                             ondragend={handleUnplannedDragEnd}
                                         >
-                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
                                             </svg>
                                         </button>
                                     </td>
-                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-400 select-none text-xs">{task.id}</td>
-                                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-white select-none">{task.orderId}</td>
-                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300 select-none">{task.style}</td>
-                                    <td class="px-4 py-2 text-right font-mono select-none">{task.quantity}</td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">{task.id}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="font-semibold text-gray-800">{task.orderId}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.style}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 text-right select-none">
+                                        <span class="font-semibold text-gray-800">{task.quantity?.toLocaleString() ?? '—'}</span>
+                                    </td>
                                 </tr>
                             {/each}
                         </tbody>
                     </table>
                     {#if unplannedTasks.length === 0}
-                        <div class="p-4 text-center text-gray-500">No unplanned tasks</div>
+                        <div class="p-10 text-center">
+                            <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                            <p class="text-gray-400 text-sm">No available strips</p>
+                        </div>
+                    {:else if availableFiltered().length === 0}
+                        <div class="p-10 text-center">
+                            <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                            <p class="text-gray-400 text-sm">No strips match "<span class="font-medium text-gray-500">{availableSearch}</span>"</p>
+                        </div>
                     {/if}
                 </div>
             </div>
@@ -745,54 +832,106 @@
                 : 'left: calc(50% + 8rem); bottom: 7rem; transform: translateX(-50%);'}
             transition:slide
         >
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-[600px] max-w-[90vw] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[60vh]">
-                <!-- Header (drag here to move panel) -->
+            <div class="bg-white rounded-xl shadow-2xl w-[700px] max-w-[95vw] border border-gray-200 overflow-hidden flex flex-col" style="max-height: 62vh;">
+                <!-- Header -->
                 <div
-                    class="bg-indigo-100 dark:bg-indigo-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-move select-none"
+                    class="px-4 py-3 border-b border-gray-100 flex justify-between items-center cursor-move select-none"
+                    style="background: linear-gradient(135deg, #3730a3 0%, #312e81 100%);"
                     role="button"
                     tabindex="0"
                     onmousedown={(e) => startPanelDrag(e, 'unplanned2')}
                     onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
                 >
-                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Unplanned Orders</h3>
-                    <button 
-                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
-                        onclick={() => { showUnplanned2 = false; unplannedPanel2Pos = null; }}
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-white opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                        <h3 class="font-bold text-white text-sm">Unplanned Orders</h3>
+                        <span class="bg-white/20 text-white text-xs font-semibold px-2 py-0.5 rounded-full">{unplannedOrders.length}</span>
+                    </div>
+                    <button
+                        aria-label="Close Unplanned Orders panel"
+                        class="text-white/70 hover:text-white transition-colors cursor-pointer shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-white/20"
+                        onclick={() => { showUnplanned2 = false; unplannedPanel2Pos = null; unplannedSearch = ''; }}
                     >
-                        ✕
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
-                
+
+                <!-- Search bar -->
+                <div class="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                        <input
+                            type="text"
+                            placeholder="Search by Order, Style or Customer…"
+                            bind:value={unplannedSearch}
+                            class="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-gray-700 placeholder-gray-400"
+                        />
+                        {#if unplannedSearch}
+                            <button
+                                aria-label="Clear search"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                onclick={() => unplannedSearch = ''}
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        {/if}
+                    </div>
+                    {#if unplannedSearch}
+                        <p class="text-[10px] text-gray-400 mt-1">{unplannedOrdersFiltered().length} of {unplannedOrders.length} orders</p>
+                    {/if}
+                </div>
+
                 <!-- Table Content -->
-                <div class="overflow-y-auto p-0">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
-                            <tr>
-                                <th class="px-4 py-2">Order</th>
-                                <th class="px-4 py-2">Style</th>
-                                <th class="px-4 py-2">Customer</th>
-                                <th class="px-4 py-2 text-center">Strips</th>
-                                <th class="px-4 py-2 text-right">Total Qty</th>
+                <div class="overflow-y-auto">
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead class="sticky top-0 z-10">
+                            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Order</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Style</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Customer</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap">Strips</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Total Qty</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {#each unplannedOrders as order (order.orderId)}
-                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-white select-none">{order.orderId}</td>
-                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300 select-none">{order.style}</td>
-                                    <td class="px-4 py-2 text-gray-500 dark:text-gray-400 select-none text-xs">{order.customer}</td>
-                                    <td class="px-4 py-2 text-center">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                            {#each unplannedOrdersFiltered() as order, i (order.orderId)}
+                                <tr
+                                    class="border-b border-gray-100"
+                                    style={i % 2 === 0 ? 'background: #ffffff;' : 'background: #f9fafb;'}
+                                    onmouseenter={(e) => e.currentTarget.style.background = '#eef2ff'}
+                                    onmouseleave={(e) => e.currentTarget.style.background = i % 2 === 0 ? '#ffffff' : '#f9fafb'}
+                                >
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="font-semibold text-gray-800">{order.orderId}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{order.style}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{order.customer || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 text-center select-none">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
                                             {order.stripCount}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-2 text-right font-mono select-none">{order.totalQty.toLocaleString()}</td>
+                                    <td class="px-3 py-2.5 text-right select-none">
+                                        <span class="font-semibold text-gray-800">{order.totalQty.toLocaleString()}</span>
+                                    </td>
                                 </tr>
                             {/each}
                         </tbody>
                     </table>
                     {#if unplannedOrders.length === 0}
-                        <div class="p-8 text-center text-gray-400 text-sm">No unplanned orders</div>
+                        <div class="p-10 text-center">
+                            <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
+                            <p class="text-gray-400 text-sm">No unplanned orders</p>
+                        </div>
+                    {:else if unplannedOrdersFiltered().length === 0}
+                        <div class="p-10 text-center">
+                            <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                            <p class="text-gray-400 text-sm">No orders match "<span class="font-medium text-gray-500">{unplannedSearch}</span>"</p>
+                        </div>
                     {/if}
                 </div>
             </div>
@@ -812,7 +951,7 @@
                 <!-- Header -->
                 <div
                     class="px-4 py-3 border-b border-gray-100 flex justify-between items-center cursor-move select-none"
-                    style="background: linear-gradient(135deg, #059669 0%, #047857 100%);"
+                    style="background: linear-gradient(135deg, #065f46 0%, #064e3b 100%);"
                     role="button"
                     tabindex="0"
                     onmousedown={(e) => startPanelDrag(e, 'planned')}
