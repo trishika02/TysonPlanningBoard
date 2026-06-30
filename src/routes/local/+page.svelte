@@ -29,6 +29,8 @@
             let unplannedPanel2Pos = $state(null);
             /** Dragged position for Planned Strips panel */
             let plannedPanelPos = $state(null);
+            /** Search query for the Planned Strips panel */
+            let plannedSearch = $state('');
             /** When dragging the panel by its header: { panel, startX, startY, startLeft, startTop } */
             let panelDragState = $state(null);
             let sidebar; // Sidebar instance binding
@@ -65,6 +67,18 @@
                 ).sort((a, b) => a.orderId.localeCompare(b.orderId))
             );
             
+            // Filtered planned strips for the Planned Strips panel search
+            const plannedFiltered = $derived(() => {
+                const q = plannedSearch.trim().toLowerCase();
+                if (!q) return tasks;
+                return tasks.filter(t =>
+                    (t.id || '').toLowerCase().includes(q) ||
+                    (t.orderId || '').toLowerCase().includes(q) ||
+                    (t.style || '').toLowerCase().includes(q) ||
+                    (t.status || '').toLowerCase().includes(q)
+                );
+            });
+
             // === 2. MOCK DATA & CONSTANTS ===
 
 //             export const floor_line_data = [
@@ -643,7 +657,7 @@
 
         <button
             class="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-emerald-700 transition-all font-medium"
-            onclick={() => { showPlanned = !showPlanned; if (showPlanned) { showUnplanned = false; showUnplanned2 = false; unplannedPanelPos = null; unplannedPanel2Pos = null; } }}
+            onclick={() => { showPlanned = !showPlanned; if (showPlanned) { showUnplanned = false; showUnplanned2 = false; unplannedPanelPos = null; unplannedPanel2Pos = null; } else { plannedSearch = ''; } }}
         >
             Planned Strips
         </button>
@@ -794,58 +808,131 @@
                 : 'left: calc(50% + 8rem); bottom: 7rem; transform: translateX(-50%);'}
             transition:slide
         >
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-[680px] max-w-[90vw] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[60vh]">
+            <div class="bg-white rounded-xl shadow-2xl w-[760px] max-w-[95vw] border border-gray-200 overflow-hidden flex flex-col" style="max-height: 62vh;">
                 <!-- Header -->
                 <div
-                    class="bg-emerald-100 dark:bg-emerald-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-move select-none"
+                    class="px-4 py-3 border-b border-gray-100 flex justify-between items-center cursor-move select-none"
+                    style="background: linear-gradient(135deg, #059669 0%, #047857 100%);"
                     role="button"
                     tabindex="0"
                     onmousedown={(e) => startPanelDrag(e, 'planned')}
                     onkeydown={(e) => e.key === 'Enter' && e.currentTarget.click()}
                 >
-                    <h3 class="font-bold text-gray-800 dark:text-gray-100">Planned Strips <span class="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-300">({tasks.length})</span></h3>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-white opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <h3 class="font-bold text-white text-sm">Planned Strips</h3>
+                        <span class="bg-white/20 text-white text-xs font-semibold px-2 py-0.5 rounded-full">{tasks.length}</span>
+                    </div>
                     <button
-                        class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer shrink-0"
-                        onclick={() => { showPlanned = false; plannedPanelPos = null; }}
+                        aria-label="Close Planned Strips panel"
+                        class="text-white/70 hover:text-white transition-colors cursor-pointer shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-white/20"
+                        onclick={() => { showPlanned = false; plannedPanelPos = null; plannedSearch = ''; }}
                     >
-                        ✕
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
+
+                <!-- Search bar -->
+                <div class="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                        <input
+                            type="text"
+                            placeholder="Search by Strip ID, Order, Style or Status…"
+                            bind:value={plannedSearch}
+                            class="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent text-gray-700 placeholder-gray-400"
+                        />
+                        {#if plannedSearch}
+                            <button
+                                aria-label="Clear search"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                onclick={() => plannedSearch = ''}
+                            >
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        {/if}
+                    </div>
+                    {#if plannedSearch}
+                        <p class="text-[10px] text-gray-400 mt-1">{plannedFiltered().length} of {tasks.length} strips</p>
+                    {/if}
+                </div>
+
                 <!-- Table Content -->
-                <div class="overflow-y-auto p-0">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 sticky top-0">
-                            <tr>
-                                <th class="px-4 py-2">Strip ID</th>
-                                <th class="px-4 py-2">Order</th>
-                                <th class="px-4 py-2">Style</th>
-                                <th class="px-4 py-2">Line</th>
-                                <th class="px-4 py-2">Start</th>
-                                <th class="px-4 py-2">End</th>
-                                <th class="px-4 py-2 text-right">Qty</th>
+                <div class="overflow-y-auto">
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead class="sticky top-0 z-10">
+                            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Strip ID</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Order</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Style</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Status</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Line</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Start</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">End</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Qty</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {#each tasks as task}
+                            {#each plannedFiltered() as task, i}
                                 {@const lineObj = lines.find(l => l.id === task.lineId)}
+                                {@const isInProgress = task.status === 'In Progress'}
+                                {@const isCompleted = task.status === 'Completed' || task.status === 'Done'}
                                 <tr
-                                    class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-emerald-50 cursor-pointer transition-colors"
-                                    onclick={() => { showPlanned = false; plannedPanelPos = null; calendar?.scrollToTask(task.id); }}
+                                    class="border-b border-gray-100 cursor-pointer transition-colors group"
+                                    style={i % 2 === 0 ? 'background: #ffffff;' : 'background: #f9fafb;'}
+                                    onmouseenter={(e) => e.currentTarget.style.background = '#ecfdf5'}
+                                    onmouseleave={(e) => e.currentTarget.style.background = i % 2 === 0 ? '#ffffff' : '#f9fafb'}
+                                    onclick={() => { showPlanned = false; plannedPanelPos = null; plannedSearch = ''; calendar?.scrollToTask(task.id); }}
                                     title="Click to go to this strip on the board"
                                 >
-                                    <td class="px-4 py-2 text-gray-500 text-xs select-none">{task.id}</td>
-                                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-white select-none">{task.orderId}</td>
-                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300 select-none">{task.style}</td>
-                                    <td class="px-4 py-2 text-gray-500 select-none text-xs">{lineObj?.name ?? task.lineId}</td>
-                                    <td class="px-4 py-2 text-gray-500 select-none text-xs">{task.start ? task.start.slice(0, 10) : '—'}</td>
-                                    <td class="px-4 py-2 text-gray-500 select-none text-xs">{task.end ? task.end.slice(0, 10) : '—'}</td>
-                                    <td class="px-4 py-2 text-right font-mono select-none">{task.quantity?.toLocaleString() ?? '—'}</td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">{task.id}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="font-semibold text-gray-800">{task.orderId}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.style}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        {#if isInProgress}
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>In Progress
+                                            </span>
+                                        {:else if isCompleted}
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>{task.status}
+                                            </span>
+                                        {:else}
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>{task.status || 'Not Started'}
+                                            </span>
+                                        {/if}
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none text-gray-600">{lineObj?.name ?? task.lineId}</td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-700 font-medium">{task.start ? task.start.slice(0, 10) : '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-700 font-medium">{task.end ? task.end.slice(0, 10) : '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 text-right select-none">
+                                        <span class="font-semibold text-gray-800">{task.quantity?.toLocaleString() ?? '—'}</span>
+                                    </td>
                                 </tr>
                             {/each}
                         </tbody>
                     </table>
                     {#if tasks.length === 0}
-                        <div class="p-8 text-center text-gray-400 text-sm">No planned strips</div>
+                        <div class="p-10 text-center">
+                            <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                            <p class="text-gray-400 text-sm">No planned strips</p>
+                        </div>
+                    {:else if plannedFiltered().length === 0}
+                        <div class="p-10 text-center">
+                            <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                            <p class="text-gray-400 text-sm">No strips match "<span class="font-medium text-gray-500">{plannedSearch}</span>"</p>
+                        </div>
                     {/if}
                 </div>
             </div>
