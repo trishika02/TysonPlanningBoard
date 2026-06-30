@@ -30,7 +30,9 @@
     }
 
     function handleReset() {
-        dateValue = '';
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        dateValue = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
         onResetDate();
     }
 </script>

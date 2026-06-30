@@ -90,6 +90,15 @@
         daysBefore = 0;
         daysAfter = 30;
         renderBoard();
+        // Scroll calendar body back so today's column (at pixel 0) is at the left edge
+        tick().then(() => {
+            const body = document.getElementById('calendar-body');
+            if (body) {
+                body.scrollLeft = 0;
+                const header = document.getElementById('calendar-header');
+                if (header) header.scrollLeft = 0;
+            }
+        });
     }
 
     // Scroll the calendar so a given task is visible and centred horizontally
@@ -180,6 +189,7 @@
     let selectedTaskForDateTime = $state(null);
     let dateTimeModalValue = $state(''); // YYYY-MM-DD
     let dateTimeTimeValue = $state('08:00'); // HH:MM
+    let dateTimeModalError = $state('');
 
     // Helpers
     function getStandardWorkHours(dayOfWeek) {
@@ -426,7 +436,14 @@
         draggedTaskId = taskPtr.id;
         // Verify we have the latest task state from the array (in case taskPtr is stale, though unlikely in this flow)
         const task = tasks.find(t => t.id === draggedTaskId) || taskPtr;
-        
+
+        // In Progress strips are locked — cannot be moved
+        if (task.status === 'In Progress') {
+            e.preventDefault();
+            draggedTaskId = null;
+            return;
+        }
+
         originalLineId = task.lineId;
         
         const taskRect = e.target.getBoundingClientRect();
@@ -783,6 +800,7 @@
             showStripDetailsModal = true;
         } else if (item.id === 'update-datetime' && selectedTaskForContext) {
             selectedTaskForDateTime = selectedTaskForContext;
+            dateTimeModalError = '';
             if (selectedTaskForContext.start) {
                 const d = new Date(selectedTaskForContext.start);
                 dateTimeModalValue = selectedTaskForContext.start.slice(0, 10);
@@ -808,9 +826,24 @@
         const task = tasks.find(t => t.id === selectedTaskForDateTime.id);
         if (!task) return;
 
+        // In Progress strips cannot be rescheduled
+        if (task.status === 'In Progress') {
+            dateTimeModalError = 'Cannot reschedule a strip that is In Progress.';
+            return;
+        }
+
+        // Reject if the selected date falls on a holiday or off-day
+        const dayEntry = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === dateTimeModalValue);
+        if (dayEntry && dayEntry.isBlocked) {
+            dateTimeModalError = 'Cannot start a strip on a holiday or off-day.';
+            return;
+        }
+
         const timeStr = dateTimeTimeValue || '00:00';
         const newStart = new Date(`${dateTimeModalValue}T${timeStr}:00`);
         if (isNaN(newStart.getTime())) return;
+
+        dateTimeModalError = '';
 
         if (recalculateTask) {
             const result = recalculateTask(task, newStart, task.lineId);
@@ -1762,12 +1795,13 @@
                             {/if}
                         {/if}
 
-                        <Task 
+                        <Task
                             {task}
                             style={taskStyle}
                             isMergeCandidate={isCandidate}
                             isDimmed={isDimmed}
                             isBoardDragging={isDragging}
+                            isLocked={task.status === 'In Progress'}
                             onDragStart={(e) => handleDragStart(e, task)}
                             onDragEnd={(e) => handleDragEnd(e)}
                             onClick={(e, t) => {
@@ -1892,10 +1926,13 @@
                         </div>
                     </div>
                     <p class="text-xs text-gray-400 mt-2">The end date will be recalculated based on quantity and line efficiency.</p>
+                    {#if dateTimeModalError}
+                        <p class="text-xs text-red-600 mt-2 font-medium">{dateTimeModalError}</p>
+                    {/if}
                 </div>
                 <div class="px-6 pb-6 flex gap-3">
                     <button
-                        onclick={() => { showDateTimeModal = false; selectedTaskForDateTime = null; }}
+                        onclick={() => { showDateTimeModal = false; selectedTaskForDateTime = null; dateTimeModalError = ''; }}
                         class="flex-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 py-2.5 rounded-xl transition-colors"
                     >
                         Cancel
