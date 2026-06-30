@@ -1694,7 +1694,7 @@
     </div>
 
     <!-- Fixed Month Indicator -->
-    <div id="fixed-month-indicator" class="flex-shrink-0 h-10 text-white flex items-center justify-center shadow-sm z-30 relative border-b border-slate-600" style="background: linear-gradient(135deg, #334155 0%, #1e293b 100%);">
+    <div id="fixed-month-indicator" class="flex-shrink-0 h-10 text-white flex items-center justify-center shadow-sm z-30 relative border-b border-blue-900" style="background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);">
         <span class="font-bold text-sm tracking-widest uppercase opacity-90">{currentVisibleMonth || 'Loading...'}</span>
     </div>
     

@@ -121,7 +121,7 @@
 	<div class="min-h-screen bg-slate-100 flex flex-col items-center">
 
 		<!-- Top Navigation Bar -->
-		<nav class="w-[90%] rounded-b-xl px-6 py-4 mb-6 flex justify-between items-center shadow-lg" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+		<nav class="w-[90%] rounded-b-xl px-6 py-4 mb-6 flex justify-between items-center shadow-lg" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
 			<div class="flex items-center">
 				<h1 class="text-xl font-bold text-white tracking-tight">ALTERSENSE</h1>
 			</div>
