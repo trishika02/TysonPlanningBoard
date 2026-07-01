@@ -121,38 +121,38 @@
 	<div class="min-h-screen bg-slate-100 flex flex-col items-center">
 
 		<!-- Top Navigation Bar -->
-		<nav class="w-[90%] rounded-b-xl px-6 py-4 mb-6 flex justify-between items-center shadow-lg" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
+		<nav class="w-[90%] rounded-b-xl px-8 py-5 mb-6 flex justify-between items-center shadow-lg" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
 			<div class="flex items-center">
-				<h1 class="text-xl font-bold text-white tracking-tight">ALTERSENSE</h1>
+				<h1 class="text-2xl font-bold text-white tracking-tight">ALTERSENSE</h1>
 			</div>
-			<div class="flex items-center space-x-3">
+			<div class="flex items-center space-x-4">
 				<!-- Board selector button -->
 				{#if auth.selectedBoard}
 					<button
 						onclick={() => showBoardSelector = true}
-						class="flex items-center gap-2 text-sm font-medium text-white/90 bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-lg transition-colors border border-white/10"
+						class="flex items-center gap-2 text-sm font-medium text-white/90 bg-white/10 hover:bg-white/15 px-4 py-2 rounded-lg transition-colors border border-white/10"
 					>
 						<span class="text-xs text-white/50">Board:</span>
 						<span>{auth.selectedBoard.name}</span>
 					</button>
 				{/if}
 
-				<div class="w-px h-6 bg-white/20"></div>
+				<div class="w-px h-7 bg-white/20"></div>
 				<button
-					class="bg-blue-500 hover:bg-blue-400 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg"
+					class="bg-blue-500 hover:bg-blue-400 text-white text-sm font-semibold py-2.5 px-5 rounded-lg transition-colors shadow-md hover:shadow-lg"
 					onclick={handleSave}
 				>
 					Save Changes
 				</button>
-				<div class="w-px h-6 bg-white/20"></div>
+				<div class="w-px h-7 bg-white/20"></div>
 
 				<!-- Profile dropdown -->
 				<div class="relative">
 					<button
 						onclick={() => showProfileDropdown = !showProfileDropdown}
-						class="flex items-center gap-2 text-sm font-medium text-white hover:bg-white/10 px-2 py-1.5 rounded-lg transition-colors"
+						class="flex items-center gap-2.5 text-sm font-medium text-white hover:bg-white/10 px-2 py-1.5 rounded-lg transition-colors"
 					>
-						<div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">
+						<div class="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white text-base font-semibold shrink-0">
 							{auth.user?.charAt(0).toUpperCase()}
 						</div>
 						<svg class="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,16 +1,16 @@
         
         <script>
-            import { getFloorLineData, getStripsWithLearningCurve, getWorkHourData, getWorkHourDateRange, getShiftDetails, updateStripsFromTyson, saveTysonChanges, fetchAndSetCsrfToken} from '$lib/api-call';
+            import { fetchAndSetCsrfToken, getFloorLineData, getShiftDetails, getStripsWithLearningCurve, getWorkHourData, getWorkHourDateRange, saveTysonChanges } from '$lib/api-call';
             import Calendar from '$lib/components/Calendar.svelte';
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
-            import { floor_line_data } from '$lib/stores/data';
             import { auth } from '$lib/stores/auth.svelte.js';
-            import { toast, dismiss as dismissToast } from '$lib/stores/toast.svelte.js';
-            import { calculateSingleStripTimeline, calculateStripTimelines, transformStripsToTasks, generateTimeline } from '$lib/utils/taskCalculator';
-            import { onMount, getContext } from 'svelte';
-            import { slide } from 'svelte/transition';
+            import { floor_line_data } from '$lib/stores/data';
+            import { dismiss as dismissToast, toast } from '$lib/stores/toast.svelte.js';
             import formatToERPDateTime from '$lib/utils/frappe_datetime_formatter';
+            import { calculateStripTimelines, generateTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
+            import { getContext, onMount } from 'svelte';
+            import { slide } from 'svelte/transition';
 
 
 
@@ -39,7 +39,7 @@
             let panelDragState = $state(null);
             let sidebar; // Sidebar instance binding
             let calendar; // Calendar instance binding
-            
+
             // Save state
             let isSaving = $state(false);
             // Track changes for backend sync on save

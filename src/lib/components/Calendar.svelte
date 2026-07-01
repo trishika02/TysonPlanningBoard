@@ -28,6 +28,21 @@
     let workHourDataList = []; // Plain array, no reactivity needed
     let workHourMap = new Map(); // Fast lookup cache
     let currentVisibleMonth = $state(''); // Track current visible month based on scroll
+
+    // Toolbar search
+    let calendarSearch = $state('');
+    let showCalendarResults = $state(false);
+    const calendarSearchResults = $derived(
+        calendarSearch.trim()
+            ? tasks.filter(t => {
+                const q = calendarSearch.trim().toLowerCase();
+                return (t.id || '').toLowerCase().includes(q) ||
+                    (t.orderId || '').toLowerCase().includes(q) ||
+                    (t.style || '').toLowerCase().includes(q) ||
+                    (t.status || '').toLowerCase().includes(q);
+              })
+            : []
+    );
     
     // Constants - Calendar starts on today and shows 30 days forward
     let daysBefore = $state(0);  // Start on today (no days before)
@@ -1589,7 +1604,7 @@
 
 <div id="main-content" class="flex-1 flex flex-col h-full overflow-hidden">
     <!-- Calendar Static Toolbar (Top Row) -->
-    <div id="calendar-toolbar" class="flex-shrink-0 h-12 border-b border-slate-200 bg-slate-50 flex items-center justify-between px-4 z-20 relative">
+    <div id="calendar-toolbar" class="flex-shrink-0 h-14 border-b border-slate-200 bg-slate-50 flex items-center justify-between px-4 z-20 relative">
         <!-- Left: Load Earlier/Later Buttons -->
         <div class="flex items-center gap-2">
             <button 
@@ -1680,15 +1695,124 @@
                 </div>
             {/if}
 
-            <div class="relative group">
-                <input 
-                    type="text" 
-                    placeholder="Search..." 
-                    class="text-xs pl-8 pr-3 py-1.5 border border-slate-200 bg-white rounded-full w-32 focus:w-48 transition-all focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 shadow-sm"
-                >
-                <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2 group-focus-within:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
+            <!-- Toolbar Search -->
+            <div class="relative">
+                <!-- Input row -->
+                <div class="flex items-center gap-2.5 border-2 border-slate-200 bg-white rounded-xl pl-4 pr-3 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all w-72">
+                    <svg class="w-4.5 h-4.5 text-slate-400 shrink-0 transition-colors" style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input
+                        type="text"
+                        placeholder="Search strip, order, style…"
+                        bind:value={calendarSearch}
+                        class="text-sm text-slate-700 placeholder-slate-400 bg-transparent border-none outline-none flex-1 min-w-0"
+                        onfocus={() => showCalendarResults = true}
+                        onblur={() => setTimeout(() => { showCalendarResults = false; }, 200)}
+                        onkeydown={(e) => { if (e.key === 'Escape') { calendarSearch = ''; showCalendarResults = false; e.currentTarget.blur(); } }}
+                    />
+                    {#if calendarSearch}
+                        <button
+                            aria-label="Clear search"
+                            onclick={() => { calendarSearch = ''; }}
+                            class="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    {/if}
+                </div>
+
+                <!-- Results dropdown -->
+                {#if showCalendarResults && calendarSearch.trim()}
+                    <div class="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                        <!-- Header -->
+                        <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50 flex items-center justify-between rounded-t-2xl">
+                            {#if calendarSearchResults.length > 0}
+                                <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    {calendarSearchResults.length} result{calendarSearchResults.length !== 1 ? 's' : ''}
+                                </span>
+                                <span class="text-[10px] text-slate-400 italic">Click to jump to strip</span>
+                            {:else}
+                                <span class="text-[11px] font-semibold text-slate-400">No results</span>
+                            {/if}
+                        </div>
+
+                        {#if calendarSearchResults.length > 0}
+                            <div class="max-h-[60vh] overflow-y-auto divide-y divide-slate-100">
+                                {#each calendarSearchResults.slice(0, 20) as task, i}
+                                    {@const lineObj = lines.find(l => l.id === task.lineId)}
+                                    {@const isInProgress = task.status === 'In Progress'}
+                                    {@const isCompleted = task.status === 'Completed' || task.status === 'Done'}
+                                    <button
+                                        class="w-full text-left px-4 py-3 transition-colors"
+                                        style={i % 2 === 0 ? 'background:#ffffff' : 'background:#f9fafb'}
+                                        onmouseenter={(e) => e.currentTarget.style.background = '#eff6ff'}
+                                        onmouseleave={(e) => e.currentTarget.style.background = i % 2 === 0 ? '#ffffff' : '#f9fafb'}
+                                        onmousedown={() => { scrollToTask(task.id); calendarSearch = ''; showCalendarResults = false; }}
+                                    >
+                                        <!-- Row 1: Strip ID + Status badge -->
+                                        <div class="flex items-center justify-between gap-2 mb-1.5">
+                                            <span class="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">{task.id}</span>
+                                            {#if isInProgress}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 shrink-0">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>In Progress
+                                                </span>
+                                            {:else if isCompleted}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 shrink-0">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>{task.status}
+                                                </span>
+                                            {:else}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 shrink-0">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>Planned
+                                                </span>
+                                            {/if}
+                                        </div>
+                                        <!-- Row 2: Order ID + Style -->
+                                        <div class="flex items-baseline gap-2 mb-1">
+                                            <span class="text-[12px] font-bold text-gray-800">{task.orderId}</span>
+                                            <span class="text-slate-300 text-xs">·</span>
+                                            <span class="text-[11px] text-gray-600 truncate">{task.style}</span>
+                                        </div>
+                                        <!-- Row 3: Line + Qty -->
+                                        <div class="flex items-center gap-3 text-[10px] text-slate-400">
+                                            {#if lineObj}
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                                                    </svg>
+                                                    {lineObj.name}
+                                                </span>
+                                            {/if}
+                                            {#if task.quantity}
+                                                <span class="flex items-center gap-1">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                                    </svg>
+                                                    {task.quantity.toLocaleString()} pcs
+                                                </span>
+                                            {/if}
+                                        </div>
+                                    </button>
+                                {/each}
+                                {#if calendarSearchResults.length > 20}
+                                    <div class="px-4 py-2.5 bg-slate-50 text-center text-[11px] text-slate-400 border-t border-slate-100">
+                                        +{calendarSearchResults.length - 20} more — refine your search to narrow results
+                                    </div>
+                                {/if}
+                            </div>
+                        {:else}
+                            <div class="px-4 py-10 text-center">
+                                <svg class="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                                </svg>
+                                <p class="text-sm font-medium text-slate-500">No strips found</p>
+                                <p class="text-xs text-slate-400 mt-1">Try searching by strip ID, order ID, or style name</p>
+                            </div>
+                        {/if}
+                    </div>
+                {/if}
             </div>
         </div>
     </div>
