@@ -452,8 +452,8 @@
         // Verify we have the latest task state from the array (in case taskPtr is stale, though unlikely in this flow)
         const task = tasks.find(t => t.id === draggedTaskId) || taskPtr;
 
-        // In Progress strips are locked — cannot be moved
-        if (task.status === 'In Progress') {
+        // On Going strips are locked — cannot be moved
+        if (task.status === 'On Going') {
             e.preventDefault();
             draggedTaskId = null;
             return;
@@ -841,9 +841,9 @@
         const task = tasks.find(t => t.id === selectedTaskForDateTime.id);
         if (!task) return;
 
-        // In Progress strips cannot be rescheduled
-        if (task.status === 'In Progress') {
-            dateTimeModalError = 'Cannot reschedule a strip that is In Progress.';
+        // On Going strips cannot be rescheduled
+        if (task.status === 'On Going') {
+            dateTimeModalError = 'Cannot reschedule a strip that is On Going.';
             return;
         }
 
@@ -1743,7 +1743,7 @@
                             <div class="max-h-[60vh] overflow-y-auto divide-y divide-slate-100">
                                 {#each calendarSearchResults.slice(0, 20) as task, i}
                                     {@const lineObj = lines.find(l => l.id === task.lineId)}
-                                    {@const isInProgress = task.status === 'In Progress'}
+                                    {@const isInProgress = task.status === 'On Going'}
                                     {@const isCompleted = task.status === 'Completed' || task.status === 'Done'}
                                     <button
                                         class="w-full text-left px-4 py-3 transition-colors"
@@ -1757,7 +1757,7 @@
                                             <span class="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">{task.id}</span>
                                             {#if isInProgress}
                                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 shrink-0">
-                                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>In Progress
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>On Going
                                                 </span>
                                             {:else if isCompleted}
                                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 shrink-0">
@@ -1912,9 +1912,9 @@
                                 >
                                     <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400 animate-pulse"></div>
                                     
-                                    <span class="text-[9px] font-black tracking-wider text-white bg-amber-600 border border-amber-400 px-1.5 py-0.5 rounded shadow-md select-none transform scale-100 whitespace-nowrap">
+                                    <!-- <span class="text-[9px] font-black tracking-wider text-white bg-amber-600 border border-amber-400 px-1.5 py-0.5 rounded shadow-md select-none transform scale-100 whitespace-nowrap">
                                         Running
-                                    </span >
+                                    </span > -->
                                 </div>
                             {/if}
                         {/if}
@@ -1925,7 +1925,7 @@
                             isMergeCandidate={isCandidate}
                             isDimmed={isDimmed}
                             isBoardDragging={isDragging}
-                            isLocked={task.status === 'In Progress'}
+                            isLocked={task.status === 'On Going'}
                             onDragStart={(e) => handleDragStart(e, task)}
                             onDragEnd={(e) => handleDragEnd(e)}
                             onClick={(e, t) => {
