@@ -52,6 +52,7 @@
     const ZOOM_STEP = 40; // px per zoom step
     const ZOOM_MIN = 40;  // Minimum column width (~60 days visible = ~2 months)
     const ZOOM_MAX = 350; // Maximum column width (~4 days visible)
+    let zoomPercentage = $derived(Math.round(((dayColumnWidth - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100));
 
     function zoomIn() {
         // Larger columns = fewer days visible (min ~4 days)
@@ -1603,84 +1604,83 @@
 </script>
 
 <div id="main-content" class="flex-1 flex flex-col h-full overflow-hidden">
-    <!-- Calendar Static Toolbar (Top Row) -->
     <div id="calendar-toolbar" class="flex-shrink-0 h-14 border-b border-slate-200 bg-slate-50 flex items-center justify-between px-4 z-20 relative">
-        <!-- Left: Load Earlier/Later Buttons -->
-        <div class="flex items-center gap-2">
-            <button 
-                onclick={loadEarlierDays}
-                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-full border border-slate-200 transition-colors"
-            >
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-                Earlier
-            </button>
-            <span class="text-xs text-slate-400">+30 days</span>
-            <button 
-                onclick={loadLaterDays}
-                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-full border border-slate-200 transition-colors"
-            >
-                Later
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-            </button>
-
-            <!-- Divider -->
-            <span class="w-px h-5 bg-slate-300 mx-1"></span>
-
-            <!-- Zoom Out -->
-            <button
-                onclick={zoomOut}
-                disabled={dayColumnWidth <= ZOOM_MIN}
-                title="Zoom Out (max 2 months visible)"
-                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-full border border-slate-200 transition-colors"
-            >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
-                </svg>
-                Zoom Out
-            </button>
-
-            <!-- Zoom In -->
-            <button
-                onclick={zoomIn}
-                disabled={dayColumnWidth >= ZOOM_MAX}
-                title="Zoom In (min 4 days visible)"
-                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-full border border-slate-200 transition-colors"
-            >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
-                </svg>
-                Zoom In
-            </button>
-        </div>
         
-        <!-- Center: Date Range Display -->
-        {#if calendarDays.length > 0}
-            {@const startDate = calendarDays[0].date}
-            {@const endDate = calendarDays[calendarDays.length - 1].date}
-            {@const startDay = startDate.getDate()}
-            {@const startMonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][startDate.getMonth()]}
-            {@const startYear = startDate.getFullYear()}
-            {@const endDay = endDate.getDate()}
-            {@const endMonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][endDate.getMonth()]}
-            {@const endYear = endDate.getFullYear()}
-            <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-white px-4 py-1.5 rounded-full border border-slate-200 shadow-sm">
-                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-                <span class="text-xs font-semibold text-slate-600">
-                    {startDay} {startMonth} {startYear} <span class="text-slate-400 mx-1">→</span> {endDay} {endMonth} {endYear}
-                </span>
+        <div class="flex items-center gap-3 shrink-0">
+            <div class="flex items-center gap-2 shrink-0">
+                <button 
+                    onclick={loadEarlierDays}
+                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-full border border-slate-200 transition-colors"
+                >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    Earlier
+                </button>
+                <span class="text-xs text-slate-400">+30 days</span>
+                <button 
+                    onclick={loadLaterDays}
+                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-full border border-slate-200 transition-colors"
+                >
+                    Later
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
             </div>
-        {/if}
 
-        <div class="flex items-center gap-3">
+            <span class="w-px h-5 bg-slate-300 shrink-0"></span>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                    onclick={zoomOut}
+                    disabled={dayColumnWidth <= ZOOM_MIN}
+                    title="Zoom Out (max 2 months visible)"
+                    class="flex items-center justify-center w-8 h-8 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-full border border-slate-200 transition-colors"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
+                    </svg>
+                </button>
+
+                <button
+                    onclick={zoomIn}
+                    disabled={dayColumnWidth >= ZOOM_MAX}
+                    title="Zoom In (min 4 days visible)"
+                    class="flex items-center justify-center w-8 h-8 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-full border border-slate-200 transition-colors"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                    </svg>
+                </button>
+            </div>
+
+            {#if calendarDays.length > 0}
+                {@const startDate = calendarDays[0].date}
+                {@const endDate = calendarDays[calendarDays.length - 1].date}
+                {@const startDay = startDate.getDate()}
+                {@const startMonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][startDate.getMonth()]}
+                {@const startYear = startDate.getFullYear()}
+                {@const endDay = endDate.getDate()}
+                {@const endMonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][endDate.getMonth()]}
+                {@const endYear = endDate.getFullYear()}
+                <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-sm shrink-0 select-none ml-1">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <span class="text-xs font-semibold text-slate-600 tracking-wide">
+                        {startDay} {startMonth} {startYear} <span class="text-slate-400 mx-0.5">→</span> {endDay} {endMonth} {endYear}
+                    </span>
+                </div>
+            {/if}
+        </div>
+
+        <div class="flex-1 min-w-[8px]"></div>
+
+        <div class="flex items-center gap-3 min-w-0 shrink">
             {#if selectedTaskIdsForGap.size > 0}
-                <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full text-xs">
-                    <span class="font-medium text-amber-800">
+                <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full text-xs shrink-0">
+                    <span class="font-medium text-amber-800 whitespace-nowrap">
                         Selected: {selectedTaskIdsForGap.size}/2 strips
                     </span>
                     <button onclick={clearGapSelection} class="text-amber-500 hover:text-amber-700 ml-1 font-bold">✕</button>
@@ -1690,21 +1690,27 @@
                         class="ml-2 px-2.5 py-0.5 font-semibold text-[11px] uppercase tracking-wider rounded-md text-white transition-all
                                {canFillGap ? 'bg-amber-600 hover:bg-amber-700 shadow-sm' : 'bg-gray-300 cursor-not-allowed opacity-60'}"
                     >
-                        ⚡ Fill Gap
+                        Fill Gap
                     </button>
                 </div>
             {/if}
 
-            <!-- Toolbar Search -->
-            <div class="relative">
-                <!-- Input row -->
-                <div class="flex items-center gap-2.5 border-2 border-slate-200 bg-white rounded-xl pl-4 pr-3 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all w-72">
-                    <svg class="w-4.5 h-4.5 text-slate-400 shrink-0 transition-colors" style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center gap-1 bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 shadow-sm select-none shrink-0">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>{zoomPercentage}%</span>
+            </div>
+
+            <div class="relative flex-1 min-w-[140px] max-w-[288px]">
+                <div class="flex items-center gap-2 border-2 border-slate-200 bg-white rounded-xl pl-3 pr-2 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all w-full">
+                    <svg class="w-4 h-4 text-slate-400 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
                     <input
                         type="text"
-                        placeholder="Search strip, order, style…"
+                        placeholder="Search…"
                         bind:value={calendarSearch}
                         class="text-sm text-slate-700 placeholder-slate-400 bg-transparent border-none outline-none flex-1 min-w-0"
                         onfocus={() => showCalendarResults = true}
@@ -1971,7 +1977,7 @@
             x={contextMenuX}
             y={contextMenuY}
             menuItems={[
-                { id: 'toggle-gap-select', label: selectedTaskForContext && selectedTaskIdsForGap.has(selectedTaskForContext.id) ? 'Deselect to Fill Gap' : 'Select to Fill Gap ⚡', icon: '📍' },
+                { id: 'toggle-gap-select', label: selectedTaskForContext && selectedTaskIdsForGap.has(selectedTaskForContext.id) ? 'Deselect to Fill Gap' : 'Select to Fill Gap', icon: '📍' },
                 { id: 'split', label: 'Split Task', icon: '✂️' },
                 { id: 'merge', label: 'Merge Task', icon: '🔗' },
                 { id: 'strip-details', label: 'Strip Details', icon: '📋' },
