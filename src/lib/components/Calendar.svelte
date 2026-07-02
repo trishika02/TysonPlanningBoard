@@ -725,9 +725,22 @@
             const newStartDate = new Date(leftEdgeDay.date.getTime() + minutesIntoDay * 60 * 1000);
             const newEndDate = new Date(newStartDate.getTime() + durationMs);
 
+            const checkEndDate = new Date(newEndDate.getTime() - 1);
+            const endDateStr = formatDate(checkEndDate, 'YYYY-MM-DD');
+            const rightEdgeDay = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === endDateStr);
+            let isRightEdgeBlocked = false;
+            if (rightEdgeDay) {
+                const isWeekendEnd = rightEdgeDay.dayOfWeek === 5 || rightEdgeDay.dayOfWeek === 6;
+                const rightWorkHours = getLineWorkHours(rightEdgeDay.date, newLineId, rightEdgeDay.isBlocked);
+                isRightEdgeBlocked = isWeekendEnd || rightEdgeDay.isBlocked || rightWorkHours === 0;
+            } else {
+                const endDayOfWeek = checkEndDate.getDay();
+                isRightEdgeBlocked = endDayOfWeek === 5 || endDayOfWeek === 6;
+            }
+
             const hasOverlap = isOverlapping(activeTaskId, newLineId, newStartDate, newEndDate);
 
-            if (isLeftEdgeBlocked || hasOverlap) {
+            if (isLeftEdgeBlocked || isRightEdgeBlocked || hasOverlap) {
                 ghostTaskElement.classList.remove('valid');
                 ghostTaskElement.classList.add('invalid');
                 if (dragOutlineElement) {
@@ -1261,6 +1274,26 @@
         // Calculate time within the day based on the fraction
         const minutesIntoDay = dayFraction * 24 * 60; // Total minutes into the day
         const newStartDate = new Date(baseDate.getTime() + minutesIntoDay * 60 * 1000);
+
+        const initialEndDate = new Date(newStartDate.getTime() + durationMs);
+        const checkEndDate = new Date(initialEndDate.getTime() - 1);
+        const endDateStr = formatDate(checkEndDate, 'YYYY-MM-DD');
+        const rightEdgeDay = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === endDateStr);
+        let isRightEdgeBlocked = false;
+        if (rightEdgeDay) {
+            const isWeekendEnd = rightEdgeDay.dayOfWeek === 5 || rightEdgeDay.dayOfWeek === 6;
+            const rightWorkHours = getLineWorkHours(rightEdgeDay.date, newLineId, rightEdgeDay.isBlocked);
+            isRightEdgeBlocked = isWeekendEnd || rightEdgeDay.isBlocked || rightWorkHours === 0;
+        } else {
+            const endDayOfWeek = checkEndDate.getDay();
+            isRightEdgeBlocked = endDayOfWeek === 5 || endDayOfWeek === 6;
+        }
+
+        if (isRightEdgeBlocked) {
+            console.warn("Cannot drop: Task ends on a blocked day!");
+            handleDragEnd();
+            return;
+        }
 
         // Recalculate timeline using production system logic if function is available
         let newEndDate;
