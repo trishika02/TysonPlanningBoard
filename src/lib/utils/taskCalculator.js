@@ -179,7 +179,7 @@ export function transformStripToTask(strip) {
     const workingDays = totalDays;
 
     // Calculate completed quantity from timeline
-    const completedQty = strip.plannedQty || 0;
+    const completedQty = strip.completedQty || 0;
 
     // Never mix sources: current-time fallback for start + real past deliveryDate for end = end < start
     let startISO, endISO;
