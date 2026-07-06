@@ -270,6 +270,31 @@
         return date.toLocaleString();
     }
 
+    // Computes the month (or month range, when zoomed out far enough to show 2+ months) currently visible in the calendar body
+    function updateVisibleMonthRange() {
+        if (!calendarDays.length) return;
+        const body = document.getElementById('calendar-body');
+        const scrollLeft = body ? body.scrollLeft : 0;
+        const clientWidth = body ? body.clientWidth : dayColumnWidth;
+
+        const firstIndex = Math.min(calendarDays.length - 1, Math.max(0, Math.floor(scrollLeft / dayColumnWidth)));
+        const lastIndex = Math.min(calendarDays.length - 1, Math.max(firstIndex, Math.ceil((scrollLeft + clientWidth) / dayColumnWidth) - 1));
+
+        const firstDate = calendarDays[firstIndex].date;
+        const lastDate = calendarDays[lastIndex].date;
+        const firstMonth = formatDate(firstDate, 'MMM YYYY');
+        const lastMonth = formatDate(lastDate, 'MMM YYYY');
+
+        if (firstMonth === lastMonth) {
+            currentVisibleMonth = firstMonth;
+        } else if (firstDate.getFullYear() === lastDate.getFullYear()) {
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            currentVisibleMonth = `${monthNames[firstDate.getMonth()]} – ${lastMonth}`;
+        } else {
+            currentVisibleMonth = `${firstMonth} – ${lastMonth}`;
+        }
+    }
+
     function getPixelOffsetForDate(date, lineId) {
         if (!calendarDays.length) return 0;
 
@@ -1454,10 +1479,8 @@
         }
         calendarDays = tempDays;
 
-        // Set initial visible month (first day of calendar)
-        if (calendarDays.length > 0) {
-            currentVisibleMonth = formatDate(calendarDays[0].date, 'MMM YYYY');
-        }
+        // Set visible month (or month range) based on current scroll position
+        updateVisibleMonthRange();
 
         // Render Dates
         calendarDays.forEach((day) => {
@@ -1885,12 +1908,8 @@
             const header = document.getElementById('calendar-header');
             if(header) header.scrollLeft = e.target.scrollLeft;
             
-            // Update current visible month based on scroll position
-            const scrollLeft = e.target.scrollLeft;
-            const visibleDayIndex = Math.floor(scrollLeft / dayColumnWidth);
-            if (calendarDays[visibleDayIndex]) {
-                currentVisibleMonth = formatDate(calendarDays[visibleDayIndex].date, 'MMM YYYY');
-            }
+            // Update current visible month (or month range) based on scroll position
+            updateVisibleMonthRange();
         }}
     >
         <div id="calendar-grid" class="relative min-w-max" style="height: {lines.length * ROW_HEIGHT}px;">
