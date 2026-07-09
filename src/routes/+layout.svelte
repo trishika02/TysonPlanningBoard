@@ -11,7 +11,11 @@
 
 	let { children } = $props();
 
-	const siteName = import.meta.env.VITE_SITE_NAME || 'ALTERSENSE';
+	// Company name drives the nav logo — looked up as /static/{name}.png (see static/mim.png, static/manami.png)
+	const companyName = import.meta.env.VITE_SITE_NAME || 'mim';
+	const companyLogoSrc = `/${companyName.toLowerCase()}.png`;
+	let logoLoadFailed = $state(false);
+
 	const currentYear = new Date().getFullYear();
 	const copyrightYears = `${currentYear - 1}–${currentYear}`;
 
@@ -127,7 +131,18 @@
 		<!-- Top Navigation Bar -->
 		<nav class="w-[90%] rounded-b-xl px-8 py-5 mb-6 flex justify-between items-center shadow-lg" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
 			<div class="flex items-center">
-				<h1 class="text-2xl font-bold text-white tracking-tight">{siteName}</h1>
+				{#if !logoLoadFailed}
+					<div class="bg-white rounded-lg px-3 py-1.5 shadow-sm">
+						<img
+							src={companyLogoSrc}
+							alt={companyName}
+							class="h-7 w-auto object-contain"
+							onerror={() => logoLoadFailed = true}
+						/>
+					</div>
+				{:else}
+					<h1 class="text-2xl font-bold text-white tracking-tight uppercase">{companyName}</h1>
+				{/if}
 			</div>
 			<div class="flex items-center space-x-4">
 				<!-- Board selector button -->
@@ -207,7 +222,7 @@
 					target="_blank"
 					rel="noopener noreferrer"
 					class="font-semibold text-slate-600 hover:text-blue-600 transition-colors"
-				>{siteName}</a>. All rights reserved.
+				>Altersense</a>. All rights reserved.
 			</p>
 		</footer>
 
