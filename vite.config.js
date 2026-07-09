@@ -1,12 +1,16 @@
+import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
+
+const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), 'VITE_');
+const apiBaseUrl = env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export default defineConfig({
 	server: {
 		proxy: {
 			'/api': {
-				target: 'http://127.0.0.1:8000',
+				target: apiBaseUrl,
 				changeOrigin: true,
 				secure: false,
 				cookieDomainRewrite: { '*': '' },

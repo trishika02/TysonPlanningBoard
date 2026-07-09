@@ -1,8 +1,9 @@
 {
-    "rewrites": [
+    "routes": [
         {
-            "source": "/api/:match*",
-            "destination": "https://manami-stage.altersense.net/api/:match*"
+            "src": "/api/(.*)",
+            "dest": "${VITE_API_BASE_URL}/api/$1",
+            "env": ["VITE_API_BASE_URL"]
         }
     ]
 }
