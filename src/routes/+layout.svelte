@@ -11,6 +11,10 @@
 
 	let { children } = $props();
 
+	const siteName = import.meta.env.VITE_SITE_NAME || 'ALTERSENSE';
+	const currentYear = new Date().getFullYear();
+	const copyrightYears = `${currentYear - 1}–${currentYear}`;
+
 	// Save function context
 	let onSave = $state(() => {});
 
@@ -123,7 +127,7 @@
 		<!-- Top Navigation Bar -->
 		<nav class="w-[90%] rounded-b-xl px-8 py-5 mb-6 flex justify-between items-center shadow-lg" style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);">
 			<div class="flex items-center">
-				<h1 class="text-2xl font-bold text-white tracking-tight">ALTERSENSE</h1>
+				<h1 class="text-2xl font-bold text-white tracking-tight">{siteName}</h1>
 			</div>
 			<div class="flex items-center space-x-4">
 				<!-- Board selector button -->
@@ -193,6 +197,19 @@
 		<div class="w-[90%] bg-white rounded-xl shadow-xl border border-slate-200 flex-1 flex flex-col overflow-hidden mb-8 h-[80vh]">
 			{@render children()}
 		</div>
+
+		<!-- Footer -->
+		<footer class="w-[90%] pb-6 text-center">
+			<p class="text-sm text-slate-500">
+				© {copyrightYears}
+				<a
+					href="https://www.altersense.com/"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+				>{siteName}</a>. All rights reserved.
+			</p>
+		</footer>
 
 	</div>
 
