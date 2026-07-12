@@ -217,6 +217,7 @@ export function transformStripToTask(strip) {
     return {
         id: strip.id,
         lineId: strip.lineId || '',
+        planningBoard: strip.planningBoard || '',
         orderId: strip.sales_order || '',
         style: `${strip.style || ''} (${strip.color || ''})`.trim(),
         quantity: strip.quantity || strip.totalQty || 0,

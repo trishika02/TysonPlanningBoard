@@ -412,6 +412,7 @@
 
                 try {
                     // 1. Map updated strips (moved or resized)
+                    const boardName = auth.selectedBoard?.name;
                     const stripsToUpdate = [];
                     pendingUpdates.forEach(id => {
                         const task = tasks.find(t => t.id === id);
@@ -421,6 +422,10 @@
                                 id: task.id,
                                 lineId: task.lineId,
                                 floorId: matchedLine?.parentId ?? null,
+                                // Stamp the currently selected board so strips dragged in from
+                                // "Available Strip" (which may have no board assigned yet) become
+                                // owned by this board instead of staying board-less.
+                                ...(boardName ? { planningBoard: boardName } : {}),
                                 sewingStartDate: formatToERPDateTime(task.start),
                                 deliveryDate: formatToERPDateTime(task.end),
                                 strip_qty: task.quantity,
@@ -434,6 +439,10 @@
                     // 2. Map split operations (formatted for backend)
                     const formattedSplits = pendingSplits.map(split => ({
                         ...split,
+                        // Stamp the board here too — the new split-off strip is created via a
+                        // DB copy of the original *before* the original's own board update is
+                        // saved, so it can't reliably inherit the board from the original.
+                        ...(boardName ? { planningBoard: boardName } : {}),
                         sewingStartDate: formatToERPDateTime(split.sewingStartDate),
                         deliveryDate: formatToERPDateTime(split.deliveryDate)
                     }));
@@ -792,7 +801,17 @@
                                         </button>
                                     </td>
                                     <td class="px-3 py-2.5 select-none">
-                                        <span class="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">{task.id}</span>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-mono text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">{task.id}</span>
+                                            {#if !task.planningBoard}
+                                                <span
+                                                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-100 text-amber-700 whitespace-nowrap"
+                                                    title="Not yet assigned to any planning board"
+                                                >
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>No Board
+                                                </span>
+                                            {/if}
+                                        </div>
                                     </td>
                                     <td class="px-3 py-2.5 select-none">
                                         <span class="font-semibold text-gray-800">{task.orderId}</span>
