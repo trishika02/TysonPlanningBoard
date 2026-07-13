@@ -540,8 +540,9 @@
                         const d = new Date(today); d.setDate(d.getDate() + 90);
                         return d.toISOString().split('T')[0];
                     })();
-
-                    const fetchedWorkHours = await getWorkHourData(startDateStr, endDateStr, boardName);
+                    // console.log("auth.selectedBoard?",auth.selectedBoard);
+                    
+                    const fetchedWorkHours = await getWorkHourData(startDateStr, endDateStr, boardName, auth.selectedBoard?.company);
                     workHoursData = fetchedWorkHours || [];
 
                     if (fetchedShifts && fetchedShifts.length > 0) {

@@ -135,11 +135,12 @@ export const getFloorLineData = async (planningBoard) => {
 	return data?.message;
 };
 
-export const getWorkHourData = async (fromDate, toDate, planningBoard) => {
+export const getWorkHourData = async (fromDate, toDate, planningBoard, company) => {
 	const from_data = fromDate || '2026-02-01';
 	const to_data = toDate || '2026-03-01';
 	const board = encodeURIComponent(planningBoard || 'Sewing Board-MF-020226-02882');
-	const url = `/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours?company=M.I.M%20Fashion%20Wear%20Ltd.&planning_board_name=${board}&from_date=${from_data}&to_date=${to_data}`;
+	const companyParam = encodeURIComponent(company || 'M.I.M Fashion Wear Ltd.');
+	const url = `/api/method/asl_core.asl_production.doctype.work_hour_management_tool.work_hour_management_tool.get_daily_work_hours?company=${companyParam}&planning_board_name=${board}&from_date=${from_data}&to_date=${to_data}`;
 	const response = await frappeFetch(url);
 	if (!response.ok) return [];
 	const data = await response.json();
