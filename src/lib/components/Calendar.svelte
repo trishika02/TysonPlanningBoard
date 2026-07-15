@@ -1633,24 +1633,20 @@
     });
 
     $effect(() => {
-        if (workHoursData && workHoursData.length > 0) {
-            workHourDataList = JSON.parse(JSON.stringify(workHoursData));
-            workHourDataList.forEach(d => {
-                const key = `${d.Line}_${d.Date}`;
-                const existing = workHourMap.get(key);
-                if (existing) {
-                    existing.WorkHour = (parseFloat(existing.WorkHour) || 0) + (parseFloat(d.WorkHour) || 0);
-                    if (d.Shift && !existing.Shifts?.includes(d.Shift)) {
-                        existing.Shifts = [...(existing.Shifts || [existing.Shift]), d.Shift];
-                    }
-                } else {
-                    workHourMap.set(key, { ...d, Shifts: d.Shift ? [d.Shift] : [] });
-                }
-            });
-            tick().then(() => {
-                 renderBoard();
-            });
-        }
+        // Rebuild the lookup from scratch on every change. The API returns exactly one
+        // record per (Line, Date) — see get_daily_work_hours — so hours are REPLACED per
+        // key, never summed. This keeps board switches and overlapping Earlier/Later
+        // fetches (which append duplicate rows to workHoursData) from inflating hours.
+        workHourMap = new Map();
+        workHourDataList = (workHoursData && workHoursData.length > 0)
+            ? JSON.parse(JSON.stringify(workHoursData))
+            : [];
+        workHourDataList.forEach(d => {
+            workHourMap.set(`${d.Line}_${d.Date}`, { ...d, Shifts: d.Shift ? [d.Shift] : [] });
+        });
+        tick().then(() => {
+             renderBoard();
+        });
     });
 
     onMount(() => {
