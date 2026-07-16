@@ -207,18 +207,6 @@
     let dateTimeTimeValue = $state('08:00'); // HH:MM
     let dateTimeModalError = $state('');
 
-    // Helpers
-    function getStandardWorkHours(dayOfWeek) {
-        switch (dayOfWeek) {
-            case 0: return 9; // Sunday (Shorter day)
-            case 5: return 0; // Friday (Weekend)
-            case 6: return 0; // Saturday (Weekend)
-            default: return 10; // Weekday (Mon-Thurs)
-        }
-    }
-// On this nav bar thare is a search field. I want to search by order id and style id and if the search is found, then it should show as drop down button of the search input filed and if I click on the search result, then
-    
-
     function getLineWorkHours(date, lineId, isBlocked = null) {
         // 1. Check if it's a blocked day (weekend/holiday)
         const dateStr = formatDate(date, 'YYYY-MM-DD');
@@ -343,7 +331,7 @@
 
 
     // Returns segments (left offset relative to task start, width) for any blocked days the task crosses.
-    // Covers both weekends AND holidays (isBlocked = isWeekend || isHoliday).
+    // Blocked days come from the work-hour API (all lines WorkHour === 0) plus explicit holiday dates.
     function getHolidaySegments(task) {
         const taskStart = new Date(task.start);
         const taskEnd = new Date(task.end);
@@ -740,9 +728,9 @@
             lastValidatedLineIndex = lineIndex;
 
             const leftEdgeDay = calendarDays[dayIndex];
-            const isWeekendStart = leftEdgeDay.dayOfWeek === 5 || leftEdgeDay.dayOfWeek === 6;
+            // Blocked = API-driven off day (WorkHour 0) or explicit holiday — no hardcoded weekdays
             const workHours = getLineWorkHours(leftEdgeDay.date, newLineId, leftEdgeDay.isBlocked);
-            const isLeftEdgeBlocked = isWeekendStart || leftEdgeDay.isBlocked || workHours === 0;
+            const isLeftEdgeBlocked = leftEdgeDay.isBlocked || workHours === 0;
 
             // dayIndexFloat may be < dayIndex when clamped; clamp fraction to [0,1)
             const dayFraction = Math.max(0, dayIndexFloat - Math.floor(dayIndexFloat));
@@ -755,13 +743,10 @@
             const rightEdgeDay = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === endDateStr);
             let isRightEdgeBlocked = false;
             if (rightEdgeDay) {
-                const isWeekendEnd = rightEdgeDay.dayOfWeek === 5 || rightEdgeDay.dayOfWeek === 6;
                 const rightWorkHours = getLineWorkHours(rightEdgeDay.date, newLineId, rightEdgeDay.isBlocked);
-                isRightEdgeBlocked = isWeekendEnd || rightEdgeDay.isBlocked || rightWorkHours === 0;
-            } else {
-                const endDayOfWeek = checkEndDate.getDay();
-                isRightEdgeBlocked = endDayOfWeek === 5 || endDayOfWeek === 6;
+                isRightEdgeBlocked = rightEdgeDay.isBlocked || rightWorkHours === 0;
             }
+            // End date beyond the loaded range: no work-hour data to judge by — don't block
 
             const hasOverlap = isOverlapping(activeTaskId, newLineId, newStartDate, newEndDate);
 
@@ -1306,13 +1291,11 @@
         const rightEdgeDay = calendarDays.find(d => formatDate(d.date, 'YYYY-MM-DD') === endDateStr);
         let isRightEdgeBlocked = false;
         if (rightEdgeDay) {
-            const isWeekendEnd = rightEdgeDay.dayOfWeek === 5 || rightEdgeDay.dayOfWeek === 6;
+            // Blocked = API-driven off day (WorkHour 0) or explicit holiday — no hardcoded weekdays
             const rightWorkHours = getLineWorkHours(rightEdgeDay.date, newLineId, rightEdgeDay.isBlocked);
-            isRightEdgeBlocked = isWeekendEnd || rightEdgeDay.isBlocked || rightWorkHours === 0;
-        } else {
-            const endDayOfWeek = checkEndDate.getDay();
-            isRightEdgeBlocked = endDayOfWeek === 5 || endDayOfWeek === 6;
+            isRightEdgeBlocked = rightEdgeDay.isBlocked || rightWorkHours === 0;
         }
+        // End date beyond the loaded range: no work-hour data to judge by — don't block
 
         if (isRightEdgeBlocked) {
             console.warn("Cannot drop: Task ends on a blocked day!");
@@ -1459,9 +1442,10 @@
                 isOffDay = hasAnyData && allZero;
             }
 
-            const isFriSat = dayOfWeek === 5 || dayOfWeek === 6; // Fri=5, Sat=6 always off
+            // Off-days come from the work-hour API (all lines WorkHour === 0 for the date)
+            // plus any explicit dates in the holidays prop — no hardcoded weekdays.
             const isHoliday = holidays.includes(formatDate(date, 'YYYY-MM-DD'));
-            const isBlocked = isOffDay || isHoliday || isFriSat;
+            const isBlocked = isOffDay || isHoliday;
 
             // Check if this date is today
             const todayDateStr = formatDate(today, 'YYYY-MM-DD');
@@ -1473,7 +1457,6 @@
                 dayOfWeek,
                 isBlocked,
                 isHoliday,
-                isFriSat,
                 isToday
             });
         }

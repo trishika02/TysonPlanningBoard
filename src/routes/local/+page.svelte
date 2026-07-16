@@ -231,13 +231,9 @@
             ];
             let unplannedTasks = $state([]);
         
-            const MOCK_HOLIDAYS = [
-                '2025-12-16', 
-                '2025-12-25', 
-                '2026-01-01', 
-            ];
-        
-            let holidays = [...MOCK_HOLIDAYS];
+            // Off-days are derived from the work-hour API (WorkHour === 0). This list is
+            // only for explicit extra holiday dates ('YYYY-MM-DD') if ever needed.
+            let holidays = [];
             // Use actual current date
             let today = $state(new Date());
         
