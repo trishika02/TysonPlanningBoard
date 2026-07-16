@@ -266,7 +266,10 @@ function addDays(date, days) {
 }
 
 function formatDateYMD(date) {
-    return date.toISOString().split('T')[0]; // yyyy-mm-dd
+    // Use LOCAL date components — toISOString() shifts to UTC, which moves timeline
+    // dates to the previous day for local times earlier than the UTC offset.
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function timeStringToSeconds(timeStr) {
@@ -381,12 +384,15 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
     const dailyProductionArray = [];
     const rows = [];
 
-    const baseDate = new Date(sewingStartDate);
-    const sewingStartTime = sewingStartDate.includes(' ')
-        ? sewingStartDate.split(' ')[1]
-        : sewingStartDate.includes('T')
-            ? sewingStartDate.split('T')[1].split('.')[0]
-            : '00:00:00';
+    // Parse the start as an instant, then take LOCAL components for the base day and
+    // first-day start time. Correct for both input forms: 'YYYY-MM-DD HH:mm:ss' (local
+    // wall time from the API) parses as local, and ISO 'Z' strings (from the drop
+    // handler's toISOString()) parse as UTC — either way the local wall clock below is
+    // the same one the backend uses when it regenerates the timeline on save.
+    const startInstant = new Date(sewingStartDate);
+    const baseDate = new Date(startInstant.getFullYear(), startInstant.getMonth(), startInstant.getDate());
+    const padT = (n) => String(n).padStart(2, '0');
+    const sewingStartTime = `${padT(startInstant.getHours())}:${padT(startInstant.getMinutes())}:${padT(startInstant.getSeconds())}`;
 
     const shiftStartTime = shiftData.startTime;
 

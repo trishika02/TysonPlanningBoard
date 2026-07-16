@@ -635,10 +635,14 @@
                 const shiftData = shiftMap[shiftName]
                     ?? { name: shiftName, startTime: '09:00:00' };
 
-                // Build strip data for timeline calculation
+                // Build strip data for timeline calculation.
+                // Prefer the strip's OWN manpower: the backend regeneration on save and the
+                // post-reload recalculation both use strip.total_manpower, so the preview must
+                // too — otherwise the bar changes length after saving. Line manpower is only
+                // a fallback for strips with no manpower of their own.
                 const targetLine = lines.find(l => l.id === newLineId);
-                const effectiveManpower = (targetLine?.manpower > 0 ? targetLine.manpower : null)
-                    ?? task.manpower
+                const effectiveManpower = (task.manpower > 0 ? task.manpower : null)
+                    ?? (targetLine?.manpower > 0 ? targetLine.manpower : null)
                     ?? 1;
 
                 const stripData = {
