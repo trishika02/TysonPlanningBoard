@@ -15,6 +15,8 @@
         holidays = [],
         draggedUnplannedTask = null,
         workHoursData = $bindable([]),
+        planningBoard = null,
+        company = null,
         recalculateTask = null,
         onUnplannedDrop = () => {},
         onScroll = () => {},
@@ -48,11 +50,18 @@
     let daysBefore = $state(0);  // Start on today (no days before)
     let daysAfter = $state(30);   // Show 30 days after today
     // Zoom State
-    let dayColumnWidth = $state(140); // Reactive column width (was const DAY_COLUMN_WIDTH)
     const ZOOM_STEP = 40; // px per zoom step
     const ZOOM_MIN = 40;  // Minimum column width (~60 days visible = ~2 months)
     const ZOOM_MAX = 350; // Maximum column width (~4 days visible)
-    let zoomPercentage = $derived(Math.round(((dayColumnWidth - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN)) * 100));
+    const ZOOM_DEFAULT = 140; // Default column width = 0% zoom
+    let dayColumnWidth = $state(ZOOM_DEFAULT); // Reactive column width (was const DAY_COLUMN_WIDTH)
+    // 0% at the default width; negative when zoomed out (-100% at ZOOM_MIN),
+    // positive when zoomed in (+100% at ZOOM_MAX).
+    let zoomPercentage = $derived(Math.round(
+        dayColumnWidth >= ZOOM_DEFAULT
+            ? ((dayColumnWidth - ZOOM_DEFAULT) / (ZOOM_MAX - ZOOM_DEFAULT)) * 100
+            : ((dayColumnWidth - ZOOM_DEFAULT) / (ZOOM_DEFAULT - ZOOM_MIN)) * 100
+    ));
 
     function zoomIn() {
         // Larger columns = fewer days visible (min ~4 days)
@@ -63,7 +72,55 @@
     function zoomOut() {
         // Smaller columns = more days visible (max ~2 months = ~60 days)
         dayColumnWidth = Math.max(ZOOM_MIN, dayColumnWidth - ZOOM_STEP);
-        tick().then(() => renderBoard());
+        tick().then(() => {
+            renderBoard();
+            // Zooming out may reveal blank space past the loaded days — extend to fill it
+            ensureVisibleRangeLoaded();
+        });
+    }
+
+    // When the viewport shows more days than are loaded (typically after zooming out),
+    // extend the calendar forward and fetch work-hour data ONLY for the newly added
+    // date window, so the visible range always renders structured date/hour slots.
+    let isAutoExtending = false;
+    async function ensureVisibleRangeLoaded() {
+        if (isAutoExtending) return;
+        const body = document.getElementById('calendar-body');
+        if (!body) return;
+        isAutoExtending = true;
+        try {
+            // Loop in case the viewport still isn't filled after one extension
+            for (let guard = 0; guard < 4; guard++) {
+                const gridWidth = (daysBefore + daysAfter) * dayColumnWidth;
+                const visibleRight = body.scrollLeft + body.clientWidth;
+                if (gridWidth >= visibleRight) break;
+
+                // Days missing to fill the viewport; extend in at least 30-day chunks
+                const deficitDays = Math.ceil((visibleRight - gridWidth) / dayColumnWidth);
+                const chunk = Math.max(30, deficitDays);
+
+                // Fetch only the new window: (today + daysAfter) .. (today + daysAfter + chunk)
+                const startDateObj = new Date(today);
+                startDateObj.setDate(startDateObj.getDate() + daysAfter);
+                const endDateObj = new Date(today);
+                endDateObj.setDate(endDateObj.getDate() + daysAfter + chunk);
+                daysAfter += chunk;
+
+                const newAPIWorkHourData = await getWorkHourData(
+                    formatDate(startDateObj, 'YYYY-MM-DD'),
+                    formatDate(endDateObj, 'YYYY-MM-DD'),
+                    planningBoard,
+                    company
+                );
+                if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
+                    workHoursData = [...workHoursData, ...newAPIWorkHourData];
+                }
+                renderBoard();
+                await tick();
+            }
+        } finally {
+            isAutoExtending = false;
+        }
     }
     const ROW_HEIGHT = 36;
     const FOOTER_HEIGHT = 0; // Removed footer for compactness
@@ -79,7 +136,7 @@
         
         daysBefore += 30;
 
-        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"));
+        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"), planningBoard, company);
         if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
             workHoursData = [...workHoursData, ...newAPIWorkHourData];
         }
@@ -94,7 +151,7 @@
         
         daysAfter += 30;
 
-        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"));
+        const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"), planningBoard, company);
         if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
             workHoursData = [...workHoursData, ...newAPIWorkHourData];
         }
@@ -1494,9 +1551,16 @@
             workHoursRow.innerHTML = '';
             const whFrag = document.createDocumentFragment();
             calendarDays.forEach((day) => {
+                // Sum only real API records for this date — dates without data render as
+                // an empty slot ("—") instead of implying default working hours.
+                const dateStr = formatDate(day.date, 'YYYY-MM-DD');
+                const dateKey = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
                 const totalHrs = day.isBlocked
                     ? 0
-                    : lines.reduce((sum, line) => sum + getLineWorkHours(day.date, line.id, day.isBlocked), 0);
+                    : lines.reduce((sum, line) => {
+                        const rec = workHourMap.get(`${line.id}_${dateKey}`);
+                        return sum + (rec ? (rec.WorkHour || 0) : 0);
+                    }, 0);
 
                 const cell = document.createElement('div');
                 cell.className = `flex-shrink-0 border-r border-slate-200 flex items-center justify-center ${day.isBlocked ? 'bg-red-50' : 'bg-blue-50'}`;
@@ -1735,7 +1799,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
-                <span>{zoomPercentage}%</span>
+                <span>{zoomPercentage > 0 ? `+${zoomPercentage}` : zoomPercentage}%</span>
             </div>
 
             <div class="relative flex-1 min-w-[140px] max-w-[288px]">

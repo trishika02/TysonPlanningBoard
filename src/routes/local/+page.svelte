@@ -597,6 +597,8 @@
             {holidays}
             {draggedUnplannedTask}
             {workHoursData}
+            planningBoard={auth.selectedBoard?.name}
+            company={auth.selectedBoard?.company}
             recalculateTask={(task, newStartDate, newLineId) => {
                 // Helper: compute a safe fallback end date — never zero-width
                 const MIN_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
