@@ -22,7 +22,13 @@
         onScroll = () => {},
         pendingUpdates = $bindable(new Set()),
         pendingSplits = $bindable([]),
-        pendingMerges = $bindable([])
+        pendingMerges = $bindable([]),
+        // Map of shift name -> shift detail ({ name, startTime: "HH:MM:SS", ... }) from
+        // get_shift_details. The leftmost pixel of a day's column represents that day's
+        // actual shift start time (looked up per line/date via workHoursData's `Shift`
+        // field), not midnight — the column's width represents the shift's work hours
+        // (see the grid-line divisions drawn per cell), not a fixed 24h day.
+        shiftMap = {}
     } = $props();
 
     // Internal State
@@ -264,6 +270,23 @@
     let dateTimeTimeValue = $state('08:00'); // HH:MM
     let dateTimeModalError = $state('');
 
+    // Milliseconds from midnight to the actual shift start for this line/date — the
+    // reference point for that day's column left edge (see getPixelOffsetForDate /
+    // handleDrop). Looks up the real shift via workHoursData's per-record `Shift` name
+    // joined against `shiftMap` (from get_shift_details) — never a hardcoded time.
+    // Returns 0 (midnight) when the shift can't be resolved, so unknown days simply
+    // don't get shifted rather than being assigned a fabricated business hour.
+    function getShiftStartMs(date, lineId) {
+        const dateStr = formatDate(date, 'YYYY-MM-DD');
+        const date_ = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
+        const workHourData = workHourMap.get(`${lineId}_${date_}`);
+        const shiftName = workHourData?.Shift;
+        const startTime = shiftName ? shiftMap[shiftName]?.startTime : null;
+        if (!startTime) return 0;
+        const [sh, sm, ss] = startTime.split(':').map(Number);
+        return ((sh || 0) * 3600 + (sm || 0) * 60 + (ss || 0)) * 1000;
+    }
+
     function getLineWorkHours(date, lineId, isBlocked = null) {
         // 1. Check if it's a blocked day (weekend/holiday)
         const dateStr = formatDate(date, 'YYYY-MM-DD');
@@ -343,20 +366,34 @@
     function getPixelOffsetForDate(date, lineId) {
         if (!calendarDays.length) return 0;
 
-        const calendarStart = new Date(calendarDays[0].date);
-        // Normalize to start of day? No, keep time precision for accurate linear mapping
-        // calendarStart is likely 00:00 if constructed that way.
-        // Let's ensure strict linear mapping based on timestamps.
-        
         const dateObj = new Date(date);
-        
-        // Calculate difference in milliseconds
-        const diffMs = dateObj.getTime() - calendarStart.getTime();
-        
-        // Convert to days (float)
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        
-        return diffDays * dayColumnWidth;
+        const dateYMD = formatDate(dateObj, 'YYYY-MM-DD');
+        const dayIndex = calendarDays.findIndex(d => formatDate(d.date, 'YYYY-MM-DD') === dateYMD);
+
+        // Outside the loaded range — extrapolate linearly (one column = one day) from
+        // whichever boundary is closer, same as the previous behavior.
+        if (dayIndex === -1) {
+            const firstDay = calendarDays[0].date;
+            if (dateObj < firstDay) {
+                const diffDays = (dateObj.getTime() - firstDay.getTime()) / (1000 * 60 * 60 * 24);
+                return diffDays * dayColumnWidth;
+            }
+            const lastDay = calendarDays[calendarDays.length - 1].date;
+            const diffDays = (dateObj.getTime() - lastDay.getTime()) / (1000 * 60 * 60 * 24);
+            return (calendarDays.length - 1 + diffDays) * dayColumnWidth;
+        }
+
+        // Within the loaded range: a day's column represents its shift, not a full 24h day
+        // (matching the workHours-based grid lines drawn per cell) — the column's left edge
+        // is the shift start time, and its full width spans that day's work hours.
+        const day = calendarDays[dayIndex];
+        const workHours = getLineWorkHours(day.date, lineId, day.isBlocked);
+        const msIntoDay = dateObj.getTime() - day.date.getTime();
+        const fraction = workHours > 0
+            ? Math.max(0, (msIntoDay - getShiftStartMs(day.date, lineId)) / (workHours * 60 * 60 * 1000))
+            : 0;
+
+        return dayIndex * dayColumnWidth + fraction * dayColumnWidth;
     }
 
     function getTaskStyle(task) {
@@ -791,8 +828,13 @@
 
             // dayIndexFloat may be < dayIndex when clamped; clamp fraction to [0,1)
             const dayFraction = Math.max(0, dayIndexFloat - Math.floor(dayIndexFloat));
-            const minutesIntoDay = dayFraction * 24 * 60;
-            const newStartDate = new Date(leftEdgeDay.date.getTime() + minutesIntoDay * 60 * 1000);
+            // Anchor to shift start, matching handleDrop/getPixelOffsetForDate — keeps the
+            // live drag-validity check consistent with where the strip will actually land.
+            // Round to the nearest whole minute: raw mouse pixel position maps to a sub-second
+            // offset that's meaningless for scheduling (and would get saved as e.g. ":53"
+            // seconds past shift start) — a mouse can never be pixel-perfect to the second.
+            const minutesIntoShift = Math.round(dayFraction * workHours * 60);
+            const newStartDate = new Date(leftEdgeDay.date.getTime() + getShiftStartMs(leftEdgeDay.date, newLineId) + minutesIntoShift * 60 * 1000);
             const newEndDate = new Date(newStartDate.getTime() + durationMs);
 
             const checkEndDate = new Date(newEndDate.getTime() - 1);
@@ -1338,9 +1380,15 @@
 
         const baseDate = new Date(day.date);
 
-        // Calculate time within the day based on the fraction
-        const minutesIntoDay = dayFraction * 24 * 60; // Total minutes into the day
-        const newStartDate = new Date(baseDate.getTime() + minutesIntoDay * 60 * 1000);
+        // Calculate time within the day based on the fraction, anchored to the shift's
+        // start time (dayFraction 0 = shift start, dayFraction 1 = shift start + workHours)
+        // — the leftmost corner of a day column IS the shift start, not midnight, matching
+        // the workHours-based grid lines already drawn in each cell.
+        // Round to the nearest whole minute: raw mouse pixel position maps to a sub-second
+        // offset that's meaningless for scheduling (and would get saved with stray seconds,
+        // e.g. ":53" past shift start) — a mouse drop can never be pixel-perfect to the second.
+        const minutesIntoShift = Math.round(dayFraction * workHours * 60);
+        const newStartDate = new Date(baseDate.getTime() + getShiftStartMs(day.date, newLineId) + minutesIntoShift * 60 * 1000);
 
         const initialEndDate = new Date(newStartDate.getTime() + durationMs);
         const checkEndDate = new Date(initialEndDate.getTime() - 1);
@@ -1385,7 +1433,15 @@
             newEndDate = new Date(newStartDate.getTime() + durationMs);
         }
 
-        if (isOverlapping(droppedTaskId, newLineId, newStartDate, newEndDate)) {
+        // Use the shift-aligned start from the recalculated timeline when available
+        // (e.g. snapped to the line's shift start time), instead of the raw pixel-derived
+        // drop position — that raw position is midnight whenever the drop lands at/near
+        // the left edge of the day column.
+        const finalStartDate = (recalculatedData && recalculatedData.total_days > 0)
+            ? new Date(recalculatedData.start)
+            : newStartDate;
+
+        if (isOverlapping(droppedTaskId, newLineId, finalStartDate, newEndDate)) {
             console.warn("Cannot drop: Task overlaps with an existing task.");
             handleDragEnd();
             return;
@@ -1395,10 +1451,8 @@
             const taskIndex = tasks.findIndex(t => t.id === droppedTaskId);
             if (taskIndex !== -1) {
                 // Mutate existing task with recalculated data.
-                // Use newStartDate (not recalculatedData.start) so the task's left edge
-                // lands exactly at the ghost's left edge pixel.
                 tasks[taskIndex].lineId = newLineId;
-                tasks[taskIndex].start = newStartDate.toISOString();
+                tasks[taskIndex].start = finalStartDate.toISOString();
                 // Only apply recalculated data if the timeline is valid (non-empty, non-zero days)
                 if (recalculatedData && recalculatedData.total_days > 0) {
                     tasks[taskIndex].end = recalculatedData.end;
@@ -1411,11 +1465,11 @@
                 }
                 pendingUpdates.add(droppedTaskId);
             } else if (draggedUnplannedTask && droppedTaskId === draggedUnplannedTask.id) {
-                // New Task — same: use newStartDate for pixel-accurate placement.
+                // New Task — use the shift-aligned start, same as above.
                 const newTask = {
                     ...draggedUnplannedTask,
                     lineId: newLineId,
-                    start: newStartDate.toISOString(),
+                    start: finalStartDate.toISOString(),
                 };
                 if (recalculatedData && recalculatedData.total_days > 0) {
                     newTask.end = recalculatedData.end;
@@ -1544,38 +1598,6 @@
             `;
             calendarDates.appendChild(dateEl);
         });
-
-        // Render Work Hours Summary Row
-        const workHoursRow = document.getElementById('calendar-work-hours');
-        if (workHoursRow) {
-            workHoursRow.innerHTML = '';
-            const whFrag = document.createDocumentFragment();
-            calendarDays.forEach((day) => {
-                // Sum only real API records for this date — dates without data render as
-                // an empty slot ("—") instead of implying default working hours.
-                const dateStr = formatDate(day.date, 'YYYY-MM-DD');
-                const dateKey = `${dateStr.split('-')[2]}-${dateStr.split('-')[1]}-${dateStr.split('-')[0]}`;
-                const totalHrs = day.isBlocked
-                    ? 0
-                    : lines.reduce((sum, line) => {
-                        const rec = workHourMap.get(`${line.id}_${dateKey}`);
-                        return sum + (rec ? (rec.WorkHour || 0) : 0);
-                    }, 0);
-
-                const cell = document.createElement('div');
-                cell.className = `flex-shrink-0 border-r border-slate-200 flex items-center justify-center ${day.isBlocked ? 'bg-red-50' : 'bg-blue-50'}`;
-                cell.style.width = `${dayColumnWidth}px`;
-                cell.style.height = '100%';
-
-                if (totalHrs > 0) {
-                    cell.innerHTML = `<span class="text-[10px] font-semibold text-indigo-600">${totalHrs}h</span>`;
-                } else {
-                    cell.innerHTML = `<span class="text-[10px] text-gray-300">—</span>`;
-                }
-                whFrag.appendChild(cell);
-            });
-            workHoursRow.appendChild(whFrag);
-        }
 
         // Render Grid Background Cells
         if (gridBackgroundLayer) {
@@ -1927,15 +1949,11 @@
         <span class="font-bold text-sm tracking-widest uppercase opacity-90">{currentVisibleMonth || 'Loading...'}</span>
     </div>
     
-    <!-- Calendar Header (Dates + Work Hours) -->
-    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow-sm border-b border-slate-200 z-10 overflow-hidden" style="height: 76px;">
+    <!-- Calendar Header (Dates) -->
+    <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow-sm border-b border-slate-200 z-10 overflow-hidden" style="height: 48px;">
         <div class="flex flex-col w-max">
             <!-- Dates Row -->
             <div id="calendar-dates" class="flex" style="height: 48px;">
-                <!-- JS Injected -->
-            </div>
-            <!-- Total Work Hours Row -->
-            <div id="calendar-work-hours" class="flex border-t border-slate-200" style="height: 28px;">
                 <!-- JS Injected -->
             </div>
         </div>

@@ -8,7 +8,7 @@
             import { floor_line_data } from '$lib/stores/data';
             import { dismiss as dismissToast, toast } from '$lib/stores/toast.svelte.js';
             import formatToERPDateTime from '$lib/utils/frappe_datetime_formatter';
-            import { calculateStripTimelines, generateTimeline, transformStripsToTasks } from '$lib/utils/taskCalculator';
+            import { calculateStripTimelines, generateTimeline, resolveLineWorkHours, transformStripsToTasks } from '$lib/utils/taskCalculator';
             import { getContext, onMount } from 'svelte';
             import { slide } from 'svelte/transition';
 
@@ -597,6 +597,7 @@
             {holidays}
             {draggedUnplannedTask}
             {workHoursData}
+            {shiftMap}
             planningBoard={auth.selectedBoard?.name}
             company={auth.selectedBoard?.company}
             recalculateTask={(task, newStartDate, newLineId) => {
@@ -619,17 +620,16 @@
                     return safeFallback();
                 }
 
-                // Filter and sort work hours for the target line
-                const lineWorkHours = workHoursData
-                    .filter((d) => d.Line === newLineId)
-                    .sort((a, b) => a.Date.localeCompare(b.Date));
+                // Filter work hours for the target line and resolve the applicable shift
+                // chronologically from the drop date onward (matches backend behavior).
+                const { lineWorkHours, shiftName } = resolveLineWorkHours(
+                    workHoursData, newLineId, newStartDate
+                );
 
                 if (lineWorkHours.length === 0) {
                     return safeFallback();
                 }
 
-                // Resolve shift for this line
-                const shiftName = lineWorkHours[0].Shift;
                 const shiftData = shiftMap[shiftName]
                     ?? { name: shiftName, startTime: '09:00:00' };
 

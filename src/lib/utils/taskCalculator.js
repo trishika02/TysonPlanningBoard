@@ -162,7 +162,10 @@ export const calculateSingleStripTimeline = (strip, dailyWorkHours, startDate) =
 
     return {
         ...strip,
-        startDate: startDate.toISOString(),
+        // Use the shift-aligned start of the first production entry (if any) rather than
+        // the raw input startDate — the loop above may advance past midnight to the
+        // line's actual shift start time on day 1.
+        startDate: timeline.length > 0 ? timeline[0].startTime : startDate.toISOString(),
         endDate: currentTime.toISOString(),
         timeline
     };
@@ -396,7 +399,24 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
 
     const shiftStartTime = shiftData.startTime;
 
-    while (stripPendingQty > 0 && safetyCounter < 730) {
+    // Match the backend's fetch_work_hour_data exactly (strip.py): only records on/after
+    // the strip's own start date, in chronological order, accessed BY POSITION per day
+    // counter — not by re-deriving each day's date and searching for a match. Date-matching
+    // with an index-cycling fallback (the old approach) silently diverges from the backend
+    // the moment the source data has any gap or ordering quirk, since Python's `workhour_data
+    // [counter]` has no such fallback — it's pure position. Filtering + sorting once here
+    // makes position 0 the true first day, exactly like the backend, so every subsequent
+    // position lines up the same way on both sides.
+    const toISODate = (ddmmyyyy) => {
+        const [d, m, y] = ddmmyyyy.split('-');
+        return `${y}-${m}-${d}`;
+    };
+    const baseDateISO = formatDateYMD(baseDate);
+    const relevantWorkHours = workhourData
+        .filter((r) => toISODate(r.Date) >= baseDateISO)
+        .sort((a, b) => toISODate(a.Date).localeCompare(toISODate(b.Date)));
+
+    while (stripPendingQty > 0 && safetyCounter < 730 && counter < relevantWorkHours.length) {
         const row = {};
 
         // --- Date & Day ---
@@ -405,12 +425,7 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
         row.day = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
 
         // --- Working Hour (Day Capacity) ---
-        // Look up by actual date (DD-MM-YYYY) so the record always matches the calendar day,
-        // regardless of where workhourData starts. Fall back to index-cycling if no match.
-        const [yr, mo, dy] = row.date.split('-');
-        const dateDDMMYYYY = `${dy}-${mo}-${yr}`;
-        const workhourRecord = workhourData.find(r => r.Date === dateDDMMYYYY)
-            ?? workhourData[counter % workhourData.length];
+        const workhourRecord = relevantWorkHours[counter];
         const workHour = workhourRecord?.WorkHour ?? 0;
 
         // === OFF DAY: WorkHour === 0 → planned_production_qty = 0, skip to next day ===
@@ -505,14 +520,12 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
         }
 
         // --- Shift End Time ---
-        const [sH, sM] = getHoursAndMinutes(row.shift_start_time);
-        const totalH = Math.floor(row.working_hour);
-        const totalM = Math.round((row.working_hour - totalH) * 60);
-        const endDate = new Date();
-        endDate.setHours(sH, sM, 0);
-        endDate.setHours(endDate.getHours() + totalH);
-        endDate.setMinutes(endDate.getMinutes() + totalM);
-        row.shift_end_time = endDate.toTimeString().split(' ')[0];
+        // Round to the nearest whole second (matches strip.py's generate_timeline_python) —
+        // the old floor(hours) + round(minutes) approach could overflow, e.g.
+        // working_hour=4.9999 -> round(0.9999*60)=60 silently added a bogus extra hour.
+        const startSeconds = timeStringToSeconds(row.shift_start_time);
+        const totalExtraSeconds = Math.round(row.working_hour * 3600);
+        row.shift_end_time = secondsToTimeString(startSeconds + totalExtraSeconds);
 
         // --- Cumulative produced ---
         dailyProductionArray.push(row.planned_production_qty);
@@ -535,6 +548,42 @@ export function generateTimeline(strip, workhourData, shiftData, stripQtyOverrid
 }
 
 /**
+ * Filter a line's Daily Work Hour records and resolve which shift applies starting from a
+ * given date — matches the backend's fetch_work_hour_data (strip.py): records on/after the
+ * target date, ordered chronologically, first match's Shift wins.
+ *
+ * `.Date` is formatted "DD-MM-YYYY", so a plain string sort (`localeCompare`) is NOT
+ * chronological — it sorts by day-of-month digit first, e.g. "20-01-2026" would sort after
+ * "05-02-2026" even though January 20 is earlier. That silently picks the wrong shift
+ * whenever a line's work-hour data spans multiple months, shifting every day's computed
+ * start/end time by a fixed offset (the wrong shift's start time) while day-level date
+ * rollover — which looks up each day by exact date match — stays correct. Sorting on the
+ * ISO-equivalent key fixes this.
+ *
+ * @param {Array} dailyWorkHours - Daily Work Hour records (raw `Date: "DD-MM-YYYY"` strings)
+ * @param {string} lineId
+ * @param {Date} targetDate - the date scheduling should start from (e.g. the drop date)
+ * @returns {{ lineWorkHours: Array, shiftName: string|null }}
+ */
+export function resolveLineWorkHours(dailyWorkHours, lineId, targetDate) {
+    const toISO = (ddmmyyyy) => {
+        const [d, m, y] = ddmmyyyy.split('-');
+        return `${y}-${m}-${d}`;
+    };
+    const pad = (n) => String(n).padStart(2, '0');
+    const targetISO = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(targetDate.getDate())}`;
+
+    const lineWorkHours = dailyWorkHours
+        .filter((d) => d.Line === lineId)
+        .sort((a, b) => toISO(a.Date).localeCompare(toISO(b.Date)));
+
+    if (lineWorkHours.length === 0) return { lineWorkHours, shiftName: null };
+
+    const firstRelevant = lineWorkHours.find((d) => toISO(d.Date) >= targetISO) ?? lineWorkHours[0];
+    return { lineWorkHours, shiftName: firstRelevant.Shift };
+}
+
+/**
  * Calculate timelines for multiple strips (sequential scheduling per line).
  *
  * @param {Array}  strips - From get_strips_with_learning_curve API
@@ -549,17 +598,23 @@ export function calculateStripTimelines(strips, dailyWorkHours, shiftMap) {
         const { lineId } = strip;
         if (!lineId) return { ...strip, error: 'No Line ID' };
 
-        // Filter work hours for this line, sorted by date
-        const lineWorkHours = dailyWorkHours
-            .filter((d) => d.Line === lineId)
-            .sort((a, b) => a.Date.localeCompare(b.Date));
-
-        if (lineWorkHours.length === 0) {
-            return fallbackStripTimeline(strip);
+        // Trust the backend's own saved timeline (ERPNext's Strip Timeline Table) when it
+        // exists, instead of recomputing live — Daily Work Hour data can change after a
+        // strip was scheduled, so a live recompute can legitimately diverge from what was
+        // actually saved even with byte-identical math. Only recompute when the backend
+        // hasn't produced a timeline yet (e.g. a never-before-scheduled strip).
+        if (Array.isArray(strip.strip_timeline_table) && strip.strip_timeline_table.length > 0) {
+            return stripTimelineFromBackendTable(strip);
         }
 
-        // Resolve shift from first work hour record (matches ERPNext behavior)
-        const shiftName = lineWorkHours[0].Shift;
+        const { lineWorkHours, shiftName } = resolveLineWorkHours(
+            dailyWorkHours, lineId, new Date(strip.sewingStartDate)
+        );
+
+        if (lineWorkHours.length === 0) {
+            return stripTimelineFromBackendTable(strip);
+        }
+
         const shiftData = shiftMap[shiftName];
 
         if (!shiftData) {
@@ -582,7 +637,7 @@ export function calculateStripTimelines(strips, dailyWorkHours, shiftMap) {
     });
 }
 
-function fallbackStripTimeline(strip) {
+function stripTimelineFromBackendTable(strip) {
     const timeline = (strip.strip_timeline_table || []).map((row) => ({
         date: row.date,
         day: new Date(row.date).toLocaleDateString('en-US', { weekday: 'long' }),
