@@ -8,6 +8,7 @@
 	import { toast } from '$lib/stores/toast.svelte.js';
 	import { onMount, setContext } from 'svelte';
 	import '../app.css';
+	import { getWorkHourDateRange, getWorkHourData } from '$lib/api-call';
 
 	let { children } = $props();
 
@@ -57,7 +58,34 @@
 	let isLoggingOut = $state(false);
 	let showProfileDropdown = $state(false);
 
-	function selectBoard(board) {
+	async function checkWorkHourData(board) {
+		try {
+			const today = new Date();
+			const dateRange = await getWorkHourDateRange(board?.name)
+			const startDateStr = dateRange?.from_date || today.toISOString().split('T')[0];
+			const endDateStr = dateRange?.to_date || (() => {
+				const d = new Date(today); d.setDate(d.getDate() + 90);
+				return d.toISOString().split('T')[0];
+			})();
+			const fetchedWorkHours = await getWorkHourData(startDateStr, endDateStr, board?.name, board?.company);
+			if (fetchedWorkHours && fetchedWorkHours.length > 0) {
+				return true;
+			}
+			return false;
+		} catch (error) {
+			console.error('Failed to check work hour data:', error);
+			return false;
+		}
+	}
+
+	async function selectBoard(board) {
+		const hasWorkHours = await checkWorkHourData(board);
+
+		if (!hasWorkHours) {
+			toast.error('This board does not have any daily workhour setup.');
+			return;
+		}
+
 		const prev = auth.selectedBoard?.name;
 		auth.selectedBoard = board;
 		sessionStorage.setItem('selectedBoard', JSON.stringify(board));
