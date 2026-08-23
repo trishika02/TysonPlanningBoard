@@ -1,5 +1,5 @@
 <script>
-    import { getWorkHourData } from '$lib/api-call';
+    import { getWorkHourData, getWorkHourDateRange } from '$lib/api-call';
     import ContextMenu from '$lib/components/ContextMenu.svelte';
     import MergeTaskModal from '$lib/components/MergeTaskModal.svelte';
     import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
@@ -55,6 +55,44 @@
     // Constants - Calendar starts on today and shows 30 days forward
     let daysBefore = $state(0);  // Start on today (no days before)
     let daysAfter = $state(30);   // Show 30 days after today
+
+    // Board-wide workhour date range ({ from_date, to_date }, 'YYYY-MM-DD') — fetched
+    // independently of the windowed workHoursData prop, used to pick the default start
+    // date and to cap Earlier/Later navigation.
+    let boardDateRange = $state(null);
+    $effect(() => {
+        if (!planningBoard) return;
+        getWorkHourDateRange(planningBoard).then(range => {
+            boardDateRange = range;
+        });
+    });
+
+    function parseYMD(str) {
+        if (!str) return null;
+        const [y, m, d] = str.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    }
+    const boardStartDate = $derived(parseYMD(boardDateRange?.from_date));
+    const boardEndDate = $derived(parseYMD(boardDateRange?.to_date));
+
+    function getEarliestLoadedDate() {
+        const d = new Date(today);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - daysBefore);
+        return d;
+    }
+    function getLatestLoadedDate() {
+        const d = new Date(today);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + daysAfter);
+        return d;
+    }
+    function canLoadEarlier() {
+        return !boardStartDate || getEarliestLoadedDate() > boardStartDate;
+    }
+    function canLoadLater() {
+        return !boardEndDate || getLatestLoadedDate() < boardEndDate;
+    }
     // Zoom State
     const ZOOM_STEP = 40; // px per zoom step
     const ZOOM_MIN = 40;  // Minimum column width (~60 days visible = ~2 months)
@@ -135,12 +173,21 @@
 
     // Functions to load more days
     async function loadEarlierDays() {
+        if (!canLoadEarlier()) return;
+
+        let step = 30;
+        if (boardStartDate) {
+            const maxStep = Math.floor((getEarliestLoadedDate().getTime() - boardStartDate.getTime()) / 86400000);
+            step = Math.max(0, Math.min(step, maxStep));
+            if (step <= 0) return;
+        }
+
         const startDateObj = new Date(today);
-        startDateObj.setDate(startDateObj.getDate() - daysBefore - 30);
+        startDateObj.setDate(startDateObj.getDate() - daysBefore - step);
         const endDateObj = new Date(today);
         endDateObj.setDate(endDateObj.getDate() - daysBefore);
-        
-        daysBefore += 30;
+
+        daysBefore += step;
 
         const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"), planningBoard, company);
         if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
@@ -150,12 +197,21 @@
     }
 
     async function loadLaterDays() {
+        if (!canLoadLater()) return;
+
+        let step = 30;
+        if (boardEndDate) {
+            const maxStep = Math.floor((boardEndDate.getTime() - getLatestLoadedDate().getTime()) / 86400000);
+            step = Math.max(0, Math.min(step, maxStep));
+            if (step <= 0) return;
+        }
+
         const startDateObj = new Date(today);
         startDateObj.setDate(startDateObj.getDate() + daysAfter);
         const endDateObj = new Date(today);
-        endDateObj.setDate(endDateObj.getDate() + daysAfter + 30);
-        
-        daysAfter += 30;
+        endDateObj.setDate(endDateObj.getDate() + daysAfter + step);
+
+        daysAfter += step;
 
         const newAPIWorkHourData = await getWorkHourData(formatDate(startDateObj, "YYYY-MM-DD"), formatDate(endDateObj, "YYYY-MM-DD"), planningBoard, company);
         if (newAPIWorkHourData && newAPIWorkHourData.length > 0) {
@@ -1729,9 +1785,11 @@
         
         <div class="flex items-center gap-3 shrink-0">
             <div class="flex items-center gap-2 shrink-0">
-                <button 
+                <button
                     onclick={loadEarlierDays}
-                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-full border border-slate-200 transition-colors"
+                    disabled={!canLoadEarlier()}
+                    title={boardStartDate ? `Earlier (limit: ${formatDate(boardStartDate, 'YYYY-MM-DD')})` : 'Earlier'}
+                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white rounded-full border border-slate-200 transition-colors"
                 >
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -1739,9 +1797,11 @@
                     Earlier
                 </button>
                 <span class="text-xs text-slate-400">+30 days</span>
-                <button 
+                <button
                     onclick={loadLaterDays}
-                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 rounded-full border border-slate-200 transition-colors"
+                    disabled={!canLoadLater()}
+                    title={boardEndDate ? `Later (limit: ${formatDate(boardEndDate, 'YYYY-MM-DD')})` : 'Later'}
+                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white rounded-full border border-slate-200 transition-colors"
                 >
                     Later
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

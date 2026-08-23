@@ -541,6 +541,15 @@
                     const fetchedWorkHours = await getWorkHourData(startDateStr, endDateStr, boardName, auth.selectedBoard?.company);
                     workHoursData = fetchedWorkHours || [];
 
+                    // If today has no workhour record on this board, default the view to the
+                    // board's first workhour date instead of opening on a dead/empty column.
+                    const todayKey = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+                    const hasTodayWorkHour = workHoursData.some((d) => d.Date === todayKey);
+                    if (!hasTodayWorkHour && dateRange?.from_date) {
+                        const [y, m, d] = dateRange.from_date.split('-').map(Number);
+                        today = new Date(y, m - 1, d);
+                    }
+
                     if (fetchedShifts && fetchedShifts.length > 0) {
                         fetchedShifts.forEach((s) => { shiftMap[s.name] = s; });
                     } else {
