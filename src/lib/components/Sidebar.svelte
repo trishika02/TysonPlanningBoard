@@ -40,7 +40,7 @@
 <div id="sidebar" class="sticky-sidebar flex-shrink-0 bg-white shadow-lg z-20 flex flex-col h-full w-64 border-r border-gray-200">
     <!-- Sidebar Header -->
     <!-- Sidebar Header (3 Rows) -->
-    <div class="sidebar-header h-36 border-b border-gray-200 flex flex-col sticky-header bg-white flex-shrink-0 z-30">
+    <div class="sidebar-header border-b border-gray-200 flex flex-col sticky-header bg-white flex-shrink-0 z-30" style="height: 158px;">
         
         <!-- ROW 1 (Top): Date Selector -->
         <div class="h-12 w-full border-b border-slate-200 flex items-center justify-start px-4 bg-slate-50">
@@ -77,6 +77,9 @@
                 <span class="text-xs font-bold text-gray-300 uppercase tracking-widest">Loading...</span>
             {/if}
         </div>
+
+        <!-- Spacer: matches Calendar's top horizontal scrollbar (Calendar.svelte #calendar-top-scrollbar) -->
+        <div class="h-[14px] w-full border-b border-slate-200 bg-slate-50 flex-shrink-0"></div>
 
         <!-- ROW 3 (Bottom): Titles (Floor | Lines) -->
         <div class="h-12 w-full flex">
