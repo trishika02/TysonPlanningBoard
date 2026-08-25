@@ -236,6 +236,23 @@
         });
     }
 
+    // Manually animated smooth scroll — native `scrollTo({behavior:'smooth'})` silently
+    // no-ops on this container in some browser/OS configurations (confirmed), so this
+    // drives scrollLeft via requestAnimationFrame instead, which can't be ignored.
+    function animateScrollLeft(el, target, duration = 400) {
+        const start = el.scrollLeft;
+        const distance = target - start;
+        if (distance === 0) return;
+        const startTime = performance.now();
+        function step(now) {
+            const t = Math.min(1, (now - startTime) / duration);
+            const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+            el.scrollLeft = start + distance * eased;
+            if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
     // Scroll the calendar so a given task is visible and centred horizontally
     export async function scrollToTask(taskId) {
         const task = tasks.find(t => t.id === taskId);
@@ -270,20 +287,31 @@
         const body = document.getElementById('calendar-body');
         if (!body) return;
 
-        const xOffset = getPixelOffsetForDate(taskStart, task.lineId);
-        const lineIndex = lines.findIndex(l => l.id === task.lineId);
-        const yOffset = lineIndex >= 0 ? lineIndex * ROW_HEIGHT : 0;
-
-        // Centre the task horizontally in the viewport
-        const centredX = xOffset - body.clientWidth / 2 + dayColumnWidth;
-        body.scrollTo({ left: Math.max(0, centredX), top: yOffset, behavior: 'smooth' });
-
-        // Flash highlight via a temporary class on the task DOM node
+        // Let the DOM catch up to the (possibly just-expanded) calendarDays before
+        // looking up the task element, so its position/size are accurate.
         await tick();
         const taskEl = body.querySelector(`[data-task-id="${taskId}"]`);
+
         if (taskEl) {
+            // scrollIntoView({behavior:'smooth'}) silently no-ops in this layout, so
+            // scroll the container directly using the element's real rendered position.
+            const bodyRect = body.getBoundingClientRect();
+            const elRect = taskEl.getBoundingClientRect();
+            const elCenter = (elRect.left + elRect.right) / 2 - bodyRect.left;
+            const target = body.scrollLeft + elCenter - body.clientWidth / 2;
+            const lineIndex = lines.findIndex(l => l.id === task.lineId);
+            if (lineIndex >= 0) body.scrollTop = lineIndex * ROW_HEIGHT;
+            animateScrollLeft(body, Math.max(0, target));
             taskEl.classList.add('task-highlight-flash');
             setTimeout(() => taskEl.classList.remove('task-highlight-flash'), 1800);
+        } else {
+            // Fallback: task isn't rendered (e.g. off a blocked/zero-width day) — at
+            // least scroll near its date.
+            const xOffset = getPixelOffsetForDate(taskStart, task.lineId);
+            const lineIndex = lines.findIndex(l => l.id === task.lineId);
+            const yOffset = lineIndex >= 0 ? lineIndex * ROW_HEIGHT : 0;
+            body.scrollTop = yOffset;
+            animateScrollLeft(body, Math.max(0, xOffset - body.clientWidth / 2));
         }
     }
 
