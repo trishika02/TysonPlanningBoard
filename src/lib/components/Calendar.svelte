@@ -1753,6 +1753,14 @@
             // Wait, we generate DOM manually in renderBoard, so we just need the container to exist.
             tick().then(() => {
                  renderBoard();
+                 // "today" always sits at column index `daysBefore` (see renderBoard's
+                 // startDate calculation). After Earlier/Later navigation, daysBefore is
+                 // no longer 0, so a newly-picked GO date lands off-screen unless we
+                 // scroll it into view here.
+                 const body = document.getElementById('calendar-body');
+                 if (body) {
+                     body.scrollLeft = daysBefore * dayColumnWidth;
+                 }
             });
         }
     });
@@ -2008,6 +2016,19 @@
     <div id="fixed-month-indicator" class="flex-shrink-0 h-10 text-white flex items-center justify-center shadow-sm z-30 relative border-b border-blue-900" style="background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);">
         <span class="font-bold text-sm tracking-widest uppercase opacity-90">{currentVisibleMonth || 'Loading...'}</span>
     </div>
+
+    <!-- Top Horizontal Scrollbar (mirrors calendar-body's horizontal scroll) -->
+    <div
+        id="calendar-top-scrollbar"
+        class="flex-shrink-0 overflow-x-auto overflow-y-hidden custom-scrollbar"
+        style="height: 14px;"
+        onscroll={(e) => {
+            const body = document.getElementById('calendar-body');
+            if (body) body.scrollLeft = e.target.scrollLeft;
+        }}
+    >
+        <div style="width: {calendarDays.length * dayColumnWidth}px; height: 1px;"></div>
+    </div>
     
     <!-- Calendar Header (Dates) -->
     <div id="calendar-header" class="sticky-header flex-shrink-0 bg-white shadow-sm border-b border-slate-200 z-10 overflow-hidden" style="height: 48px;">
@@ -2028,7 +2049,10 @@
             // Sync header scroll X
             const header = document.getElementById('calendar-header');
             if(header) header.scrollLeft = e.target.scrollLeft;
-            
+            // Sync top scrollbar
+            const topScrollbar = document.getElementById('calendar-top-scrollbar');
+            if(topScrollbar) topScrollbar.scrollLeft = e.target.scrollLeft;
+
             // Update current visible month (or month range) based on scroll position
             updateVisibleMonthRange();
         }}
