@@ -1753,6 +1753,14 @@
             // Wait, we generate DOM manually in renderBoard, so we just need the container to exist.
             tick().then(() => {
                  renderBoard();
+                 // "today" always sits at column index `daysBefore` (see renderBoard's
+                 // startDate calculation). After Earlier/Later navigation, daysBefore is
+                 // no longer 0, so a newly-picked GO date lands off-screen unless we
+                 // scroll it into view here.
+                 const body = document.getElementById('calendar-body');
+                 if (body) {
+                     body.scrollLeft = daysBefore * dayColumnWidth;
+                 }
             });
         }
     });
