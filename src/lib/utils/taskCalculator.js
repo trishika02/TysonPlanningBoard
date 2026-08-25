@@ -204,8 +204,12 @@ export function transformStripToTask(strip) {
         startISO = new Date().toISOString();
         endISO = startISO;
     }
-    // Guard: end must not be before start (would give negative total_days)
-    if (endISO < startISO) endISO = startISO;
+    // Guard: end must not be before start (would give negative total_days).
+    // Compare as real dates, not raw strings — startDate/endDate from the backend
+    // use non-zero-padded hours (e.g. "8:00:00" vs "16:49:25"), which sort wrong
+    // lexicographically ("1" < "8") and would wrongly collapse a valid multi-hour
+    // strip to zero width, making it disappear from the board entirely.
+    if (new Date(endISO) < new Date(startISO)) endISO = startISO;
 
     console.log('[transformStripToTask]', strip.id, {
         raw_startDate: strip.startDate,
