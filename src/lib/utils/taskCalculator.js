@@ -237,6 +237,9 @@ export function transformStripToTask(strip) {
         completed_segments: [],
         // Additional metadata
         customer: strip.customer,
+        customerPoNo: strip.customerPoNo || '',
+        season: strip.season || '',
+        shipmentDate: strip.shipmentDate || '',
         smv: strip.smv,
         manpower: strip.totalManpower,
         status: strip.status,
