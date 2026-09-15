@@ -60,6 +60,9 @@
                                 orderId: key,
                                 style: task.style,
                                 customer: task.customer || '',
+                                customerPoNo: task.customerPoNo || '',
+                                season: task.season || '',
+                                shipmentDate: task.shipmentDate || '',
                                 totalQty: 0,
                                 stripCount: 0
                             };
@@ -79,7 +82,10 @@
                     (t.id || '').toLowerCase().includes(q) ||
                     (t.orderId || '').toLowerCase().includes(q) ||
                     (t.style || '').toLowerCase().includes(q) ||
-                    (t.status || '').toLowerCase().includes(q)
+                    (t.status || '').toLowerCase().includes(q) ||
+                    (t.customerPoNo || '').toLowerCase().includes(q) ||
+                    (t.season || '').toLowerCase().includes(q) ||
+                    (t.shipmentDate || '').toLowerCase().includes(q)
                 );
             });
 
@@ -90,7 +96,10 @@
                 return unplannedTasks.filter(t =>
                     (t.id || '').toLowerCase().includes(q) ||
                     (t.orderId || '').toLowerCase().includes(q) ||
-                    (t.style || '').toLowerCase().includes(q)
+                    (t.style || '').toLowerCase().includes(q) ||
+                    (t.customerPoNo || '').toLowerCase().includes(q) ||
+                    (t.season || '').toLowerCase().includes(q) ||
+                    (t.shipmentDate || '').toLowerCase().includes(q)
                 );
             });
 
@@ -101,7 +110,10 @@
                 return unplannedOrders.filter(o =>
                     (o.orderId || '').toLowerCase().includes(q) ||
                     (o.style || '').toLowerCase().includes(q) ||
-                    (o.customer || '').toLowerCase().includes(q)
+                    (o.customer || '').toLowerCase().includes(q) ||
+                    (o.customerPoNo || '').toLowerCase().includes(q) ||
+                    (o.season || '').toLowerCase().includes(q) ||
+                    (o.shipmentDate || '').toLowerCase().includes(q)
                 );
             });
 
@@ -760,7 +772,7 @@
                         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
                         <input
                             type="text"
-                            placeholder="Search by Strip ID, Order or Style…"
+                            placeholder="Search by Strip ID, Order, Style, Customer PO, Season or Delivery Date…"
                             bind:value={availableSearch}
                             class="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-gray-700 placeholder-gray-400"
                         />
@@ -788,6 +800,9 @@
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Strip ID</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Order</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Style</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Customer PO</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Season</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Delivery Date</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Qty</th>
                             </tr>
                         </thead>
@@ -830,6 +845,15 @@
                                     </td>
                                     <td class="px-3 py-2.5 select-none">
                                         <span class="text-gray-600">{task.style}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.customerPoNo || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.season || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.shipmentDate || '—'}</span>
                                     </td>
                                     <td class="px-3 py-2.5 text-right select-none">
                                         <span class="font-semibold text-gray-800">{task.quantity?.toLocaleString() ?? '—'}</span>
@@ -893,7 +917,7 @@
                         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
                         <input
                             type="text"
-                            placeholder="Search by Order, Style or Customer…"
+                            placeholder="Search by Order, Style, Customer, Customer PO, Season or Delivery Date…"
                             bind:value={unplannedSearch}
                             class="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-gray-700 placeholder-gray-400"
                         />
@@ -920,6 +944,9 @@
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Order</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Style</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Customer</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Customer PO</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Season</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Delivery Date</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap">Strips</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap">Total Qty</th>
                             </tr>
@@ -940,6 +967,15 @@
                                     </td>
                                     <td class="px-3 py-2.5 select-none">
                                         <span class="text-gray-600">{order.customer || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{order.customerPoNo || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{order.season || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{order.shipmentDate || '—'}</span>
                                     </td>
                                     <td class="px-3 py-2.5 text-center select-none">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
@@ -1008,7 +1044,7 @@
                         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
                         <input
                             type="text"
-                            placeholder="Search by Strip ID, Order, Style or Status…"
+                            placeholder="Search by Strip ID, Order, Style, Status, Customer PO, Season or Delivery Date…"
                             bind:value={plannedSearch}
                             class="w-full pl-8 pr-8 py-1.5 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent text-gray-700 placeholder-gray-400"
                         />
@@ -1035,6 +1071,9 @@
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Strip ID</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Order</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Style</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Customer PO</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Season</th>
+                                <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Delivery Date</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Status</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Line</th>
                                 <th class="px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wider text-[10px] whitespace-nowrap">Start</th>
@@ -1063,6 +1102,15 @@
                                     </td>
                                     <td class="px-3 py-2.5 select-none">
                                         <span class="text-gray-600">{task.style}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.customerPoNo || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.season || '—'}</span>
+                                    </td>
+                                    <td class="px-3 py-2.5 select-none">
+                                        <span class="text-gray-600">{task.shipmentDate || '—'}</span>
                                     </td>
                                     <td class="px-3 py-2.5 select-none">
                                         {#if isInProgress}

@@ -47,7 +47,10 @@
                 return (t.id || '').toLowerCase().includes(q) ||
                     (t.orderId || '').toLowerCase().includes(q) ||
                     (t.style || '').toLowerCase().includes(q) ||
-                    (t.status || '').toLowerCase().includes(q);
+                    (t.status || '').toLowerCase().includes(q) ||
+                    (t.customerPoNo || '').toLowerCase().includes(q) ||
+                    (t.season || '').toLowerCase().includes(q) ||
+                    (t.shipmentDate || '').toLowerCase().includes(q);
               })
             : []
     );
@@ -1998,6 +2001,14 @@
                                             <span class="text-slate-300 text-xs">·</span>
                                             <span class="text-[11px] text-gray-600 truncate">{task.style}</span>
                                         </div>
+                                        <!-- Row 2b: Customer PO + Season + Delivery Date -->
+                                        {#if task.customerPoNo || task.season || task.shipmentDate}
+                                            <div class="flex items-baseline gap-2 mb-1 text-[10px] text-slate-500">
+                                                {#if task.customerPoNo}<span>PO: {task.customerPoNo}</span>{/if}
+                                                {#if task.season}<span>Season: {task.season}</span>{/if}
+                                                {#if task.shipmentDate}<span>Delivery: {task.shipmentDate}</span>{/if}
+                                            </div>
+                                        {/if}
                                         <!-- Row 3: Line + Qty -->
                                         <div class="flex items-center gap-3 text-[10px] text-slate-400">
                                             {#if lineObj}
