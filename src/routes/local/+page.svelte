@@ -5,7 +5,6 @@
             import Sidebar from '$lib/components/Sidebar.svelte';
             import Tooltip from '$lib/components/Tooltip.svelte';
             import { auth } from '$lib/stores/auth.svelte.js';
-            import { floor_line_data } from '$lib/stores/data';
             import { dismiss as dismissToast, toast } from '$lib/stores/toast.svelte.js';
             import formatToERPDateTime from '$lib/utils/frappe_datetime_formatter';
             import { calculateStripTimelines, generateTimeline, resolveLineWorkHours, transformStripsToTasks } from '$lib/utils/taskCalculator';
@@ -140,8 +139,7 @@
                 // get floor line data from API
                 const apiData = await getFloorLineData(boardName);
 
-                // If API fails, fallback to store data
-                const data = apiData && apiData.length > 0 ? apiData : floor_line_data;
+                const data = apiData || [];
 
                 // make all keys to lowercase
                 return data.map((item) => {
@@ -160,87 +158,6 @@
             }
 
             let MOCK_FLOORS_LINES = $state([]);
-            let test_floor_lines = [
-                {
-                    "id":"floor_1",
-                    "name":"Floor 1",
-                    "lines": [
-                            { id: 'line-1', name: 'Line 01' },
-                            { id: 'line-2', name: 'Line 02' },
-                            { id: 'line-3', name: 'Line 03' },
-                            { id: 'line-4', name: 'Line 04 (Sewing)' },
-                            { id: 'line-5', name: 'Line 05' },
-                            { id: 'line-6', name: 'Line 06 (Sewing)' },
-                            { id: 'line-7', name: 'Line 07 (Finishing)' },
-                            { id: 'line-8', name: 'Line 08' },
-                            { id: 'line-9', name: 'Line 09' },
-                            { id: 'line-10', name: 'Line 10' },
-                        ]
-                },
-                {
-                    "id":"floor_2",
-                    "name":"Floor 2",
-                    "lines": [
-                        { id: 'line-11', name: 'Line 11' },
-                        { id: 'line-12', name: 'Line 12' },
-                        { id: 'line-13', name: 'Line 13' },
-                        { id: 'line-14', name: 'Line 14' },
-                        { id: 'line-15', name: 'Line 15' },
-                        { id: 'line-16', name: 'Line 16' },
-                        { id: 'line-17', name: 'Line 17' },
-                        { id: 'line-18', name: 'Line 18' },
-                        { id: 'line-19', name: 'Line 19' },
-                        { id: 'line-20', name: 'Line 20' },
-                    ]
-                }
-            ];
-        
-            function getMockDate(offsetDays) {
-                const now = new Date();
-                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-                d.setDate(d.getDate() + offsetDays);
-                if (d.getDay() === 6) d.setDate(d.getDate() + 2); // Saturday -> Monday
-                if (d.getDay() === 0) d.setDate(d.getDate() + 1); // Sunday -> Monday
-                const pad = (n) => String(n).padStart(2, '0');
-                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00:00`;
-            }
-
-            const MOCK_TASKS = [
-                {
-                    id: 'task-101',
-                    lineId: 'line-1',
-                    orderId: 'PO-4567',
-                    style: 'T-Shirt (Red)',
-                    quantity: 5000,
-                    start: getMockDate(0),
-                    end: getMockDate(8),
-                    total_days: 8,
-                    total_working_days: 6,
-                    completed_days: 3,
-                    completed_quantity: 4000,
-                    completed_segments: [
-                        { qty: 2500, color: 'bg-green-500' },
-                        { qty: 1500, color: 'bg-yellow-400' }
-                    ]
-                },
-                {
-                    id: 'task-102',
-                    lineId: 'line-2',
-                    orderId: 'PO-4568',
-                    style: 'Polo (Blue)',
-                    quantity: 3000,
-                    start: getMockDate(4),
-                    end: getMockDate(16),
-                    total_days: 16,
-                    total_working_days: 12,
-                    completed_days: 5,
-                    completed_quantity: 1500,
-                    completed_segments: [
-                        { qty: 1000, color: 'bg-green-500' },
-                        { qty: 500, color: 'bg-blue-400' }
-                    ]
-                }
-            ];
             let unplannedTasks = $state([]);
         
             // Off-days are derived from the work-hour API (WorkHour === 0). This list is
@@ -515,10 +432,10 @@
 
                 try {
                     const floorData = await get_floor_line_data(boardName);
-                    MOCK_FLOORS_LINES = (floorData && floorData.length > 0) ? floorData : test_floor_lines;
+                    MOCK_FLOORS_LINES = floorData || [];
                 } catch (error) {
                     console.error('Failed to fetch floor/line data:', error);
-                    MOCK_FLOORS_LINES = test_floor_lines;
+                    MOCK_FLOORS_LINES = [];
                 }
 
                 let flatRows = [];
@@ -574,13 +491,12 @@
                         tasks = planned;
                         unplannedTasks = unplanned;
                     } else {
-                        console.warn('No strips found, using mock data');
-                        tasks = [...MOCK_TASKS];
+                        tasks = [];
                         unplannedTasks = [];
                     }
                 } catch (error) {
                     console.error('Failed to fetch strip data:', error);
-                    tasks = [...MOCK_TASKS];
+                    tasks = [];
                     unplannedTasks = [];
                 }
             }
