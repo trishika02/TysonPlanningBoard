@@ -9,6 +9,7 @@
         onDragEnd, 
         onContextMenu, 
         formatDate,
+        getDateAtPixel = null,
         onClick = null,
         isMergeCandidate = false,
         isDimmed = false,
@@ -43,7 +44,48 @@
     }
 
 
+    let lastHoverDate = null;
+
+    function fmtNum(v) {
+        if (v === null || v === undefined || v === '' || isNaN(v)) return '—';
+        return Math.round(Number(v) * 100) / 100;
+    }
+
+    // Date of the day column under the mouse (null if it can't be resolved)
+    function getHoverDate(e) {
+        if (!getDateAtPixel) return null;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const left = parseFloat((style || '').match(/left:\s*(-?[\d.]+)px/)?.[1]);
+        if (isNaN(left)) return null;
+        return getDateAtPixel(left + (e.clientX - rect.left));
+    }
+
+    // Day-wise targets (Strip Timeline Table) + strip-level OB values
+    function buildTargetsHtml(hoverDate) {
+        try {
+            const row = hoverDate ? (task.timeline || []).find((r) => r.date === hoverDate) : null;
+            return `
+                <div class="border-t border-white/20 pt-1 mt-1">
+                    ${hoverDate ? `<div class="text-xs opacity-70">${hoverDate}</div>` : ''}
+                    <div><strong>Target Eff %:</strong> ${fmtNum(row?.efficiency)}</div>
+                    <div><strong>Target Per Day:</strong> ${fmtNum(row?.day_capacity)}</div>
+                    <div><strong>Target Per Hour:</strong> ${fmtNum(row?.per_hour_qty)}</div>
+                    <div><strong>SMV:</strong> ${fmtNum(task.obSmv)}</div>
+                    <div><strong>CM:</strong> ${fmtNum(task.obCm)}</div>
+                    <div><strong>Required M/C:</strong> ${fmtNum(task.obManpower)}</div>
+                </div>
+            `;
+        } catch (err) {
+            console.error('[Task tooltip] failed to build targets', err);
+            return '';
+        }
+    }
+
     function handleRemainingEnter(e) {
+        let hoverDate = null;
+        try { hoverDate = getHoverDate(e); } catch { hoverDate = null; }
+        lastHoverDate = hoverDate;
+
         const startStr = formatDate(new Date(task.start), 'YYYY-MM-DD HH:mm');
         const endStr = formatDate(new Date(task.end), 'YYYY-MM-DD HH:mm');
         const producedQty = task.completed_quantity || 0;
@@ -60,12 +102,20 @@
                 <div><strong>Quantity:</strong> ${producedQty} / ${task.quantity} <span class="text-xs opacity-70">(${Math.round((producedQty/task.quantity)*100)}%)</span></div>
                 <div><strong>Start:</strong> ${startStr}</div>
                 <div><strong>End:</strong> ${endStr}</div>
+                ${buildTargetsHtml(hoverDate)}
             </div>
         `;
         tooltipStore.show(e.pageX, e.pageY, content);
     }
 
     function handleMouseMove(e) {
+        // Rebuild content only when the mouse crosses into a different day
+        let hoverDate = null;
+        try { hoverDate = getHoverDate(e); } catch { hoverDate = null; }
+        if (hoverDate !== lastHoverDate) {
+            handleRemainingEnter(e);
+            return;
+        }
         tooltipStore.move(e.pageX, e.pageY);
     }
 
