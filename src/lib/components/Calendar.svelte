@@ -483,6 +483,12 @@
         return dayIndex * dayColumnWidth + fraction * dayColumnWidth;
     }
 
+    // Date (YYYY-MM-DD) of the day column at a given grid x-offset — used by strip hover
+    function getDateAtPixel(px) {
+        const day = calendarDays[Math.floor(px / dayColumnWidth)];
+        return day ? formatDate(day.date, 'YYYY-MM-DD') : null;
+    }
+
     function getTaskStyle(task) {
         const taskStart = new Date(task.start);
         const taskEnd = new Date(task.end);
@@ -2176,6 +2182,7 @@
                             }}
                             onContextMenu={(e, task) => handleTaskContextMenu(e, task)}
                             {formatDate}
+                            {getDateAtPixel}
                         />
                         
                         {#each holidaySegs as seg}
