@@ -394,7 +394,8 @@
                             id: line.id,
                             name: line.name,
                             type: 'line',
-                            parentId: floor.id
+                            parentId: floor.id,
+                            parentName: floor.name
                         });
                     }
                 }

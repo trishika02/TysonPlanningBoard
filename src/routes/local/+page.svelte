@@ -446,6 +446,7 @@
                             name: line.name,
                             type: 'line',
                             parentId: floor.id,
+                            parentName: floor.name,
                             manpower: line.manpower || 0
                         });
                     }
