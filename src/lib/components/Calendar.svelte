@@ -5,6 +5,7 @@
     import SplitTaskModal from '$lib/components/SplitTaskModal.svelte';
     import StripDetailsModal from '$lib/components/StripDetailsModal.svelte';
     import Task from '$lib/components/Task.svelte';
+    import { tooltipStore } from '$lib/stores/tooltipStore.svelte.js';
     import { onMount, tick } from 'svelte';
 
     // Props
@@ -1328,6 +1329,48 @@
         return t >= s && t <= e;
     }
 
+    // Floor-wise machine totals for a date (date header hover).
+    // Per line: max Required M/C among strips running that day (hand-off days aren't doubled).
+    // Holidays count too — operations sometimes run on them.
+    function getFloorMachineTotals(date) {
+        const t = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const lineMax = new Map();
+        for (const task of tasks) {
+            if (!task.lineId || !task.start || !task.end) continue;
+            const taskStart = new Date(task.start);
+            const taskEnd = new Date(task.end);
+            const s = new Date(taskStart.getFullYear(), taskStart.getMonth(), taskStart.getDate());
+            const e = new Date(taskEnd.getFullYear(), taskEnd.getMonth(), taskEnd.getDate());
+            if (t < s || t > e) continue;
+            const mc = Number(task.obManpower) || 0;
+            lineMax.set(task.lineId, Math.max(lineMax.get(task.lineId) || 0, mc));
+        }
+
+        // All floors in board order, starting at 0
+        const floors = new Map();
+        for (const line of lines) {
+            if (!floors.has(line.parentId)) {
+                floors.set(line.parentId, { name: line.parentName || line.parentId, total: 0 });
+            }
+        }
+        for (const [lineId, mc] of lineMax) {
+            const floor = floors.get(lines.find(l => l.id === lineId)?.parentId);
+            if (floor) floor.total += mc;
+        }
+        return [...floors.values()];
+    }
+
+    function buildFloorMachineTooltip(date) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const rows = getFloorMachineTotals(date)
+            .map(f => `<div><strong>${f.name} machine:</strong> ${f.total}</div>`)
+            .join('');
+        return `
+            <div class="text-xs opacity-70 mb-1">${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}</div>
+            ${rows}
+        `;
+    }
+
     function handleMergeTask(targetTask) {
         if (!selectedTaskForMerge || !targetTask) return;
 
@@ -1689,6 +1732,9 @@
                     ${day.isBlocked ? `<div class="text-[8px] uppercase font-bold text-red-500/70 mt-0.5">${day.isHoliday ? 'HOLIDAY' : 'HOLIDAY'}</div>` : ''}
                 </div>
             `;
+            dateEl.addEventListener('mouseenter', (e) => tooltipStore.show(e.pageX, e.pageY, buildFloorMachineTooltip(day.date)));
+            dateEl.addEventListener('mousemove', (e) => tooltipStore.move(e.pageX, e.pageY));
+            dateEl.addEventListener('mouseleave', () => tooltipStore.hide());
             calendarDates.appendChild(dateEl);
         });
 
